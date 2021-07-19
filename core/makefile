@@ -25,3 +25,5 @@ test2_draw_superpos: test2_draw_superpos.o superpos.o
 	 gcc $(LDFLAGS)  -o test2_draw_superpos test2_draw_superpos.o superpos.o   -lm  -lGLESv2 -lglfw
 	 
 
+test2_draw_superpos.o: test2_draw_superpos.c superpos.h	
+	gcc $(CCFLAGS) -c test2_draw_superpos.c

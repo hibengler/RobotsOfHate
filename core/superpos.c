@@ -22,7 +22,7 @@ But by keeping track of the distances from the 4 points, it is a distinace using
 The diagonals can be used in each version. it is much easier than doing arbitrary triangle position calculation if the distances
 were not exact diagonals.   But this mans that most offsets are L's
 */
-int newi;
+unsigned long newi;
 int is_placeholder=0;
 double oldxx[5];
 double oldyy[5];
@@ -34,11 +34,12 @@ double newzz[5];
 
 GLfloat *oldxp[5];
 if (!old_vertex) {
-  oldxp[0]=placeholder_old[0];
-  oldxp[1]=placeholder_old[0];
-  oldxp[2]=placeholder_old[0];
-  oldxp[3]=placeholder_old[0];
-  oldxp[4]=placeholder_old[0];
+  fprintf(stderr,"using a placeholder\n");
+  oldxp[0]=placeholder_old0;
+  oldxp[1]=placeholder_old0;
+  oldxp[2]=placeholder_old0;
+  oldxp[3]=placeholder_old0;
+  oldxp[4]=placeholder_old0;
   }  
 else {
   oldxp[0] = old_vertex[0];
@@ -48,14 +49,23 @@ else {
   oldxp[4] = old_vertex[4];
   }
 for (newi=0;newi<count;newi++) {
-  for (int i=0;i<5;i++) {
-    oldxx[i]=oldxp[i][newi*3];
-    oldyy[i]=oldxp[i][newi*3+1];
-    oldzz[i]=oldxp[i][newi*3+2];
+  fprintf(stderr,"newi %ld\n",newi);
+  unsigned long oldoffset;
+  unsigned long newoffset = 3*newi;
+  if(old_vertex) {
+    oldoffset=3*newi;
+    }
+  else {
+    oldoffset=0;
+    }
+  for (unsigned long i=0;i<5;i++) {
+    oldxx[i]=oldxp[i][oldoffset];
+    oldyy[i]=oldxp[i][oldoffset+1];
+    oldzz[i]=oldxp[i][oldoffset+2];
     
-    newxx[i]=new_vertex[i][newi*3];
-    newyy[i]=new_vertex[i][newi*3+1];
-    newzz[i]=new_vertex[i][newi*3+2];
+    newxx[i]=new_vertex[i][newoffset];
+    newyy[i]=new_vertex[i][newoffset+1];
+    newzz[i]=new_vertex[i][newoffset+2];
     }
   
 
@@ -319,18 +329,18 @@ for (newi=0;newi<count;newi++) {
     */
     } /* if we have an offset */
   if (deltas) {
-    deltas[0][newi*5] = off[0];
-    deltas[1][newi*5] = off[1];
-    deltas[2][newi*5] = off[2];
-    deltas[3][newi*5] = off[3];
-    deltas[4][newi*5] = off[4];
+    deltas[0][newi] = off[0];
+    deltas[1][newi] = off[1];
+    deltas[2][newi] = off[2];
+    deltas[3][newi] = off[3];
+    deltas[4][newi] = off[4];
     }
   // assign the new values at the end so new vectors can be old vectors
-  for (int i=0;i<5;i++) {   
-    new_vertex[i][newi*3] = newxx[i];
-    new_vertex[i][newi*3+1] = newyy[i];
-    new_vertex[i][newi*3+2] = newzz[i];
-    }    
+  for (unsigned long i=0;i<5;i++) {   
+    new_vertex[i][newoffset] = newxx[i];
+    new_vertex[i][newoffset+1l] = newyy[i];
+    new_vertex[i][newoffset+2l] = newzz[i];
+    }
   
   
   
