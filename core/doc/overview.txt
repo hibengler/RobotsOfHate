@@ -1,0 +1,47 @@
+fox force five will have 5 castles, with hater robots - different colors used for each
+player on each game to make it harder to collude.
+gambling is out of the question.
+
+!* nebula many to many will be used for broadcasting information
+
+
+!* use accelerator and tint and orientation to help
+
+!* Maybe use videoconvorence to do videoconferencing.
+
+!* get peoples location and use the oreitnation in order to shoot lasers around the 
+world in real life.
+
+
+Gameplay
+Five players with 5 hater robots on 5 worlds (4,6,8,12, and 20 sided jewels.
+
+Multitouch gestures.
+
+The music beats allow for synchronization for when commands are launched.
+
+Allow people to hide to develop, heal, etc.
+
+
+!* pick players from the world. -- this could be a separate app in its own right.
+
+!* Add a zekeboom game - have plugins - side jobs.
+
+
+
+modules --  lets get the app drawing - make 5 screens  lets do opengles3.
+
+Then robots
+
+then hapatic
+then accelerator and tilt 
+
+then restart on the location stuff
+
+
+
+!* make a browser version of the nebula web library if you can.
+!* make a viewer preferably on the web.
+
+!* robots of hate (battling in the fifth dimension)
+
