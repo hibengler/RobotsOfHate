@@ -282,13 +282,13 @@ for (newi=0;newi<count;newi++) {
     fprintf(stderr,"		4-2 , %lf\n",off_4_minus_2);
     fprintf(stderr,"		1-3 , %lf\n",off_1_minus_3);
     double xoff0 = off_1_minus_3 - off_4_minus_2;
-    double xoff1 = off_1_minus_3 - off_4_minus_2;
+    double xoff1 = - off_4_minus_2 + off_1_minus_3;
     double xoff2 = off_4_minus_2 - off_1_minus_3;
     double xoff3 = off_4_minus_2 + off_1_minus_3; // ???
     double xoff4 = -off_4_minus_2 -off_1_minus_3;
     
     double yoff0 = off_4_minus_2 +off_1_minus_3;
-    double yoff1 = - off_4_minus_2 - off_1_minus_3;
+    double yoff1 = off_4_minus_2 - off_1_minus_3;
     double yoff2 =   off_4_minus_2 + off_1_minus_3;
     double yoff3 =  -off_4_minus_2 - off_1_minus_3;  // ???
     double yoff4 =  off_4_minus_2 - off_1_minus_3;

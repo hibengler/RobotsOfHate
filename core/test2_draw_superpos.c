@@ -472,6 +472,7 @@ oldy=0.;
 newx=0.;
 newy=0.;
 dist=0.6666666;
+float sdist = 0.25;
 {  int i;
   for (i=0;i<3;i++) {
     unsigned long offset = i*3;
@@ -481,23 +482,23 @@ dist=0.6666666;
     pold[2+offset]+=0.;
 
     pold = old[1];
-    pold[0+offset]+=-dist;  
-    pold[1+offset]+=dist; 
+    pold[0+offset]+=dist-sdist;  
+    pold[1+offset]+=dist+sdist; 
     pold[2+offset]+=dist;
    
     pold=old[2];
-    pold[0+offset]+=-dist;
-    pold[1+offset]+=-dist;
+    pold[0+offset]+=dist-sdist;
+    pold[1+offset]+=(-dist-sdist);
     pold[2+offset]+=0.;
    
     pold = old[3];
-    pold[0+offset]+=dist; 
-    pold[1+offset]+=-dist;
+    pold[0+offset]+=(-dist+sdist); 
+    pold[1+offset]+=(-dist-sdist);
     pold[2+offset]+=0.;
      
     pold = old[4];   
-    pold[0+offset]+=-dist;
-    pold[1+offset]+=-dist;
+    pold[0+offset]+=(-dist+sdist);
+    pold[1+offset]+=(dist+sdist);
     pold[2+offset]+=0.;
     }     
   }       
@@ -662,42 +663,42 @@ int main(void) {
         glBindBuffer(GL_ARRAY_BUFFER, 0);	
 	
         letters_out(lc,0.05f,-0.025f,-0.025f,0.f,"0");
-        letters_out(lc,0.05f,0.25f-0.025f,0.25f-0.025f,0.f,"1");
-        letters_out(lc,0.05f,0.25f-0.025f,-0.25f-0.025f,0.f,"2");
-        letters_out(lc,0.05f,-0.25f-0.025f,-0.25f-0.025f,0.f,"3");
-        letters_out(lc,0.05f,-0.25f-0.025f,0.25f-0.025f,0.f,"4");
+        letters_out(lc,0.05f,0.166666666f-0.025f,0.166666666f-0.025f,0.f,"1");
+        letters_out(lc,0.05f,0.166666666f-0.025f,-0.166666666f-0.025f,0.f,"2");
+        letters_out(lc,0.05f,-0.166666666f-0.025f,-0.166666666f-0.025f,0.f,"3");
+        letters_out(lc,0.05f,-0.166666666f-0.025f,0.166666666f-0.025f,0.f,"4");
 
 	float xx=0.66666;
 	float yy=0.66666;
         letters_out(lc,0.05f,xx-0.025f,yy-0.025f,0.f,"1");
-        letters_out(lc,0.05f,xx+0.25f-0.025f,yy+0.25f-0.025f,0.f,"2");
-        letters_out(lc,0.05f,xx+0.25f-0.025f,yy+-0.25f-0.025f,0.f,"4");
-        letters_out(lc,0.05f,xx-0.25f-0.025f,yy+-0.25f-0.025f,0.f,"3");
-        letters_out(lc,0.05f,xx-0.25f-0.025f,yy+0.25f-0.025f,0.f,"0");
+        letters_out(lc,0.05f,xx+0.166666666f-0.025f,yy+0.166666666f-0.025f,0.f,"2");
+        letters_out(lc,0.05f,xx+0.166666666f-0.025f,yy+-0.166666666f-0.025f,0.f,"4");
+        letters_out(lc,0.05f,xx-0.166666666f-0.025f,yy+-0.166666666f-0.025f,0.f,"3");
+        letters_out(lc,0.05f,xx-0.166666666f-0.025f,yy+0.166666666f-0.025f,0.f,"0");
 			
 	 xx=0.66666;
 	 yy=-0.66666;
         letters_out(lc,0.05f,xx-0.025f,yy-0.025f,0.f,"2");
-        letters_out(lc,0.05f,xx+0.25f-0.025f,yy+0.25f-0.025f,0.f,"3");
-        letters_out(lc,0.05f,xx+0.25f-0.025f,yy+-0.25f-0.025f,0.f,"4");
-        letters_out(lc,0.05f,xx-0.25f-0.025f,yy+-0.25f-0.025f,0.f,"0");
-        letters_out(lc,0.05f,xx-0.25f-0.025f,yy+0.25f-0.025f,0.f,"1");
+        letters_out(lc,0.05f,xx+0.166666666f-0.025f,yy+0.166666666f-0.025f,0.f,"3");
+        letters_out(lc,0.05f,xx+0.166666666f-0.025f,yy+-0.166666666f-0.025f,0.f,"4");
+        letters_out(lc,0.05f,xx-0.166666666f-0.025f,yy+-0.166666666f-0.025f,0.f,"0");
+        letters_out(lc,0.05f,xx-0.166666666f-0.025f,yy+0.166666666f-0.025f,0.f,"1");
 			
 	 xx=-0.66666;
 	 yy=-0.66666;
         letters_out(lc,0.05f,xx-0.025f,yy-0.025f,0.f,"3");
-        letters_out(lc,0.05f,xx+0.25f-0.025f,yy+0.25f-0.025f,0.f,"4");
-        letters_out(lc,0.05f,xx+0.25f-0.025f,yy+-0.25f-0.025f,0.f,"0");
-        letters_out(lc,0.05f,xx-0.25f-0.025f,yy+-0.25f-0.025f,0.f,"1");
-        letters_out(lc,0.05f,xx-0.25f-0.025f,yy+0.25f-0.025f,0.f,"2");
+        letters_out(lc,0.05f,xx+0.166666666f-0.025f,yy+0.166666666f-0.025f,0.f,"4");
+        letters_out(lc,0.05f,xx+0.166666666f-0.025f,yy+-0.166666666f-0.025f,0.f,"0");
+        letters_out(lc,0.05f,xx-0.166666666f-0.025f,yy+-0.166666666f-0.025f,0.f,"1");
+        letters_out(lc,0.05f,xx-0.166666666f-0.025f,yy+0.166666666f-0.025f,0.f,"2");
 	
 	 xx=-0.66666;
 	 yy=0.66666;
         letters_out(lc,0.05f,xx-0.025f,yy-0.025f,0.f,"4");
-        letters_out(lc,0.05f,xx+0.25f-0.025f,yy+0.25f-0.025f,0.f,"0");
-        letters_out(lc,0.05f,xx+0.25f-0.025f,yy+-0.25f-0.025f,0.f,"1");
-        letters_out(lc,0.05f,xx-0.25f-0.025f,yy+-0.25f-0.025f,0.f,"2");
-        letters_out(lc,0.05f,xx-0.25f-0.025f,yy+0.25f-0.025f,0.f,"3");
+        letters_out(lc,0.05f,xx+0.166666666f-0.025f,yy+0.166666666f-0.025f,0.f,"0");
+        letters_out(lc,0.05f,xx+0.166666666f-0.025f,yy+-0.166666666f-0.025f,0.f,"1");
+        letters_out(lc,0.05f,xx-0.166666666f-0.025f,yy+-0.166666666f-0.025f,0.f,"2");
+        letters_out(lc,0.05f,xx-0.166666666f-0.025f,yy+0.166666666f-0.025f,0.f,"3");
 			
 	
 	
