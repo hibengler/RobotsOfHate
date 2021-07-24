@@ -11,27 +11,296 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+
+
 #define GLFW_INCLUDE_ES2
 #include <GLFW/glfw3.h>
 
+// hibfonts includes and program and shader and sruff
+
+#include "letters_render_opengles2.h"
+static lcontext *lc;
+static char *gVertexShaderOneColor =
+"uniform mat4 u_MVPMatrix;      \n"             // A constant representing the combined model/view/projection matrix.
+                   "attribute vec4 vPosition;     \n"           // Per-vertex position information we will pass in.
+                   "void main()                    \n"          // The entry point for our vertex shader.
+                   "{                              \n"
+                   "   gl_PointSize = 1.;         \n"
+                   "   gl_Position = u_MVPMatrix   \n"  // gl_Position is a special variable used to store the final position.
+                   "               * vPosition;   \n"     // Multiply the vertex by the matrix to get the final point in                                                                               $
+                   "   gl_Position =    \n"  // gl_Position is a special variable used to store the final position.
+                   "                vPosition;   \n"     // Multiply the vertex by the matrix to get the final point in                                                                               $
+                   "}                              \n";    // normalized screen coordinates.
+
+static char * gFragmentShaderOneColor =
+"precision mediump float;\n"
+        "uniform vec4 v_Color;\n"
+        "void main() {\n"
+        "  gl_FragColor = v_Color;\n"
+        "}\n";
+
+
+
+static GLuint do_effect=0;
+static GLuint one_color_program=0;
+static GLuint gvPositionHandle=0;
+static GLint mPositionHandle=0;
+static GLint mMVPMatrixHandle=0;
+
+static glMatrix modelMatrix;
+static glMatrix effectMatrix; /* used to do effects like zoom near/zoom away */
+static glMatrix viewMatrix;
+static glMatrix projectionMatrix;
+static glMatrix MVMatrix;
+static glMatrix MVPMatrix; // effective matrix for the menu - might be spinning in space.
+
+glMatrix origin_matrix;  // matrix tha makes x from -1 to 1, y from -1 to 1.  X or y might be bigger depending on orientation
+
+
+static int colorHandle;   
+
+
+
+
+static void multMatrix(glMatrix *result, glMatrix *srcA, glMatrix *srcB)
+{
+    glMatrix    tmp;
+    int         i;
+
+    for (i=0; i<4; i++)
+    {
+        tmp.mat[i][0] = (srcA->mat[i][0] * srcB->mat[0][0]) +
+                        (srcA->mat[i][1] * srcB->mat[1][0]) +
+                        (srcA->mat[i][2] * srcB->mat[2][0]) +
+                        (srcA->mat[i][3] * srcB->mat[3][0]) ;
+
+        tmp.mat[i][1] = (srcA->mat[i][0] * srcB->mat[0][1]) +
+                        (srcA->mat[i][1] * srcB->mat[1][1]) +
+                        (srcA->mat[i][2] * srcB->mat[2][1]) +
+                        (srcA->mat[i][3] * srcB->mat[3][1]) ;
+
+        tmp.mat[i][2] = (srcA->mat[i][0] * srcB->mat[0][2]) +
+                        (srcA->mat[i][1] * srcB->mat[1][2]) +
+                        (srcA->mat[i][2] * srcB->mat[2][2]) +
+                        (srcA->mat[i][3] * srcB->mat[3][2]) ;
+
+        tmp.mat[i][3] = (srcA->mat[i][0] * srcB->mat[0][3]) +
+                        (srcA->mat[i][1] * srcB->mat[1][3]) +
+                        (srcA->mat[i][2] * srcB->mat[2][3]) +
+                        (srcA->mat[i][3] * srcB->mat[3][3]) ;
+    }
+    memcpy(result, &tmp, sizeof(glMatrix));
+}
+
+
+
+static void set_origin_matrix() {
+// no effect origin matrix
+glMatrix mvmatrix;
+multMatrix(&mvmatrix,&modelMatrix,&viewMatrix);
+multMatrix(&origin_matrix,&mvmatrix,&projectionMatrix);
+}   
+
+
+static void set_matrix() {
+      
+    glMatrix *xmatrix;
+    glMatrix stageMatrix;
+    if (do_effect) {
+      multMatrix(&stageMatrix,&modelMatrix,&effectMatrix);
+      xmatrix = &stageMatrix;
+      }
+    else {  
+      xmatrix = &modelMatrix;
+      }
+    multMatrix(&MVMatrix,xmatrix,&viewMatrix);
+    multMatrix(&MVPMatrix,&MVMatrix,&projectionMatrix);
+    
+    
+    // Apply the projection and view transformation
+    glUniformMatrix4fv(mMVPMatrixHandle, 1, GL_FALSE, (GLfloat *)(&MVPMatrix));
+   checkGlError("setmatrix");
+}       
+    
+    
+static void loadIdentity(glMatrix *result)
+{
+    memset(result, 0x0, sizeof(glMatrix));
+    result->mat[0][0] = 1.0f;
+    result->mat[1][1] = 1.0f;
+    result->mat[2][2] = 1.0f;
+    result->mat[3][3] = 1.0f;
+}
+                        
+void translateMatrix(glMatrix *result, GLfloat x,GLfloat y,GLfloat z) {
+        glMatrix transmat;
+    //memset(transmat, 0x0, sizeof(glMatrix));
+    loadIdentity(&transmat);
+
+     transmat.mat[3][0] = x;
+     transmat.mat[3][1] = y;
+     transmat.mat[3][2] = z;
+     transmat.mat[3][3] = 1.0f;
+/*
+      transmat.mat[0][3] = x;
+     transmat.mat[1][3] = y;
+     transmat.mat[2][3] = z;
+     transmat.mat[3][3] = 1.0f;
+*/
+                        
+    multMatrix( result, &transmat, result );
+}
+
+void translateMatrix2(glMatrix *result, GLfloat x,GLfloat y,GLfloat z) {
+        glMatrix transmat;
+    //memset(transmat, 0x0, sizeof(glMatrix));
+    loadIdentity(&transmat);
+/*
+     transmat.mat[3][0] = x;
+     transmat.mat[3][1] = y;
+     transmat.mat[3][2] = z;
+     transmat.mat[3][3] = 1.0f;
+*/
+      transmat.mat[0][3] = x;
+     transmat.mat[1][3] = y;
+     transmat.mat[2][3] = z;
+     transmat.mat[3][3] = 1.0f;
+ 
+    
+    multMatrix( result, &transmat, result );
+}
+
+                        
+void scaleMatrix(glMatrix *result, GLfloat sx, GLfloat sy, GLfloat sz)
+{
+    result->mat[0][0] *= sx;
+    result->mat[0][1] *= sx;
+    result->mat[0][2] *= sx;
+    result->mat[0][3] *= sx;
+
+    result->mat[1][0] *= sy;
+    result->mat[1][1] *= sy;
+    result->mat[1][2] *= sy;
+    result->mat[1][3] *= sy;
+    
+    result->mat[2][0] *= sz;
+    result->mat[2][1] *= sz;
+    result->mat[2][2] *= sz;
+    result->mat[2][3] *= sz;
+}
+    
+    
+static void set_matrix_translate(GLfloat centerx,GLfloat centery) {
+    loadIdentity(&modelMatrix);
+    translateMatrix(&modelMatrix,centerx,centery,0.f);
+set_matrix();
+}          
+         
+
+  
+extern GLint common_get_shader_program(const char *vertex_shader_source, const char *fragment_shader_source);
+
+
+
+
+
+	
+
+void printGLString(const char *name, GLenum s) {
+    const char *v = (const char *) glGetString(s);
+    logit("GL %s = %s\n", name, v);
+}
+
+#ifdef NDEBUG
+int checkGlErrorReal(const char* op) {
+#else
+int checkGlError(const char* op) {
+#endif
+int eflag=0;
+    for (GLint error = glGetError(); error; error  = glGetError()) {
+        eflag=1;
+#define WORLD_display_helper_ ""
+        char *s = WORLD_display_helper_;
+#define WORLD_GL_INAVLID_ENUM "GL_INAVLID_ENUM"
+        if  (error==GL_INVALID_ENUM) {s=WORLD_GL_INAVLID_ENUM;}
+#define WORLD_GL_INVALID_VALUE "GL_INVALID_VALUE"
+        else if (error==GL_INVALID_VALUE) {s=WORLD_GL_INVALID_VALUE;}
+#define WORLD_GL_INVALID_OPERATION "GL_INVALID_OPERATION"
+        else if (error==GL_INVALID_OPERATION) {s=WORLD_GL_INVALID_OPERATION;}
+#define WORLD_GL_INVALID_FRAMEBUFFER_OPERATION "GL_INVALID_FRAMEBUFFER_OPERATION"
+        else if (error==GL_INVALID_FRAMEBUFFER_OPERATION) {s=WORLD_GL_INVALID_FRAMEBUFFER_OPERATION;}
+#define WORLD_GL_OUT_OF_MEMORY "GL_OUT_OF_MEMORY"
+        else if (error==GL_OUT_OF_MEMORY) {s = WORLD_GL_OUT_OF_MEMORY;}
+        logit("after %s() glError %s(0x%x)\n", op, s,error);
+    }
+return eflag;
+}
+
+int checkGlError3(const char *filename,int lineno,const char* op) {
+char buf[4000];
+sprintf(buf,"%s:%d: %s",filename,lineno,op);
+return checkGlError(buf);
+}
+
+int setup_graphics_for_letters_and_robots() {
+
+    loadIdentity(&modelMatrix);
+    loadIdentity(&effectMatrix);
+    loadIdentity(&viewMatrix);
+    loadIdentity(&projectionMatrix);
+        
+    set_origin_matrix();
+          
+    one_color_program = common_get_shader_program(gVertexShaderOneColor,gFragmentShaderOneColor);
+    mMVPMatrixHandle = glGetUniformLocation(one_color_program, "u_MVPMatrix");
+      if (checkGlError("glGetAttribLocation")) {
+        fprintf(stderr,"Could not create matrix handle.\n");
+        return 0;
+    }
+    gvPositionHandle = glGetAttribLocation(one_color_program, "vPosition");
+
+      if (    checkGlError("glGetAttribLocation")) {
+        fprintf(stderr,"Could not create gv position handle.\n");
+        return 0;
+    }
+    // get handle to fragment shader's v_Color member
+    colorHandle = glGetUniformLocation(one_color_program, "v_Color");
+
+    if (checkGlError("glGetAttribLocation")) {
+        fprintf(stderr,"Could not locqtuib color handle.\n");
+        return 0;
+    }
+    mPositionHandle = glGetAttribLocation(one_color_program, "vPosition");
+    if (checkGlError("glsasGetAttribLocation")) {
+        fprintf(stderr,"Could not position inn mPsoitiontable handle.\n");
+        return 0;
+    }
+    // letters init
+    set_matrix();    
+    lc = linit_context();
+    letters_opengles_setgraphics(one_color_program,colorHandle,gvPositionHandle,mPositionHandle); // needs to be set up once, with a single color program
+      //once amonst all the drivers
+    
+           
+
+    return 1;
+}
+    
+
+
+
+// hibfonts stuff ^^^
+
+
+
+
+
+
+
 static const GLuint WIDTH = 1600;
 static const GLuint HEIGHT = 1600;
-static const GLchar* vertex_shader_source =
-    "#version 100\n"
-    "attribute vec3 position;\n"
-    "void main() {\n"
-    "   gl_Position = vec4(position, 1.0);\n"
-    "}\n";
-static const GLchar* fragment_shader_source =
-    "#version 100\n"
-    "void main() {\n"
-    "   gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);\n"
-    "}\n";
-static const GLchar* fragment_shader_source2 =
-    "#version 100\n"
-    "void main() {\n"
-    "   gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);\n"
-    "}\n";
+
+
 static const GLfloat svertices[] = {
      0.0f,  0.2f, 0.0f,
      0.2f, -0.2f, 0.0f,
@@ -302,8 +571,7 @@ fprintf(stderr,"\n\n");
 
 
 int main(void) {
-    GLuint shader_program,shader_program2,vbo,vboframe;
-    GLint pos,pos2;
+    GLuint vbo,vboframe;
     GLFWwindow* window;
     step_init();
     glfwInit();
@@ -313,60 +581,133 @@ int main(void) {
     window = glfwCreateWindow(WIDTH, HEIGHT, __FILE__, NULL, NULL);
     glfwMakeContextCurrent(window);
 
-    printf("GL_VERSION  : %s\n", glGetString(GL_VERSION) );
-    printf("GL_RENDERER : %s\n", glGetString(GL_RENDERER) );
+//    printf("GL_VERSION  : %s\n", glGetString(GL_VERSION) );
+//    printf("GL_RENDERER : %s\n", glGetString(GL_RENDERER) );
+ 
 
-    shader_program = common_get_shader_program(vertex_shader_source, fragment_shader_source);
-    pos = glGetAttribLocation(shader_program, "position");
-    shader_program2 = common_get_shader_program(vertex_shader_source, fragment_shader_source2);
-    pos2 = glGetAttribLocation(shader_program2, "position");
+    
 
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    setup_graphics_for_letters_and_robots();	// this has a matrix to do 3d model, effect, etc
+
+    
+
+    glClearColor(0.0f, 0.0f, 0.3f, 1.0f);
     glViewport(0, 0, WIDTH, HEIGHT);
-
+	checkGlError("vp");
 
     glGenBuffers(1, &vbo);
+	checkGlError("a");
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	checkGlError("b");
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
-    glEnableVertexAttribArray(pos);
+	checkGlError("c");
+    glVertexAttribPointer(mPositionHandle, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
+   glEnableVertexAttribArray(mPositionHandle);
+	checkGlError("d");
+	
     glBindBuffer(GL_ARRAY_BUFFER, 0);
+	checkGlError("e");
     
     glGenBuffers(1, &vboframe);
+	checkGlError("f");
     glBindBuffer(GL_ARRAY_BUFFER, vboframe);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(lines)-4, lines, GL_STATIC_DRAW);
-        glVertexAttribPointer(pos2, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
-        glEnableVertexAttribArray(pos2);
+	checkGlError("g");
+    glBufferData(GL_ARRAY_BUFFER, sizeof(lines), lines, GL_STATIC_DRAW);
+	checkGlError("h");
+    glVertexAttribPointer(mPositionHandle, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
+   glEnableVertexAttribArray(mPositionHandle);
+	checkGlError("i");
     glBindBuffer(GL_ARRAY_BUFFER, 0);
+	checkGlError("j");
 
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
 	step();
         glClear(GL_COLOR_BUFFER_BIT);
 	
+	checkGlError("clear");
 	
 	
-        glUseProgram(shader_program);
+        glUseProgram(one_color_program);
+	checkGlError("useprogram");
+        glUniform4f(colorHandle, 0.8f,0.7f,0.3f,1.0f);
 
 	glBindBuffer(GL_ARRAY_BUFFER, vbo);	
-        glVertexAttribPointer(pos, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
+        checkGlError("glBundBuffervbo");
+    glVertexAttribPointer(mPositionHandle, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
+   glEnableVertexAttribArray(mPositionHandle);
+        checkGlError("glBundBuffervbovab");
+	 
         glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
+        checkGlError("blbufferdatavbo");
 	
         glDrawArrays(GL_TRIANGLES, 0, 6);
+        checkGlError("gradtriangles");
 
-	glFlush();
-			
+	fprintf(stderr,"vbo %f,%f,%f,%f,%f,%f,%f,%f,%f\n",vertices[0],vertices[1],vertices[2],
+			vertices[3],vertices[4],vertices[5],
+			vertices[6],vertices[7],vertices[8]);
     
 
         glBindBuffer(GL_ARRAY_BUFFER, vboframe);	
-        glUseProgram(shader_program2);
+        glUniform4f(colorHandle, 0.8f,1.0f,1.0f,1.0f);
+    glVertexAttribPointer(mPositionHandle, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
+   glEnableVertexAttribArray(mPositionHandle);
         glBufferData(GL_ARRAY_BUFFER, sizeof(lines), lines, GL_STATIC_DRAW);
-        glVertexAttribPointer(pos2, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
         glDrawArrays(GL_LINE_STRIP, 0, 12);
+
 	
-	glFlush();	
+
+        lc->needed_points->line_width=0.0428f;
+        glBindBuffer(GL_ARRAY_BUFFER, 0);	
+	
+        letters_out(lc,0.05f,-0.025f,-0.025f,0.f,"0");
+        letters_out(lc,0.05f,0.25f-0.025f,0.25f-0.025f,0.f,"1");
+        letters_out(lc,0.05f,0.25f-0.025f,-0.25f-0.025f,0.f,"2");
+        letters_out(lc,0.05f,-0.25f-0.025f,-0.25f-0.025f,0.f,"3");
+        letters_out(lc,0.05f,-0.25f-0.025f,0.25f-0.025f,0.f,"4");
+
+	float xx=0.66666;
+	float yy=0.66666;
+        letters_out(lc,0.05f,xx-0.025f,yy-0.025f,0.f,"1");
+        letters_out(lc,0.05f,xx+0.25f-0.025f,yy+0.25f-0.025f,0.f,"2");
+        letters_out(lc,0.05f,xx+0.25f-0.025f,yy+-0.25f-0.025f,0.f,"4");
+        letters_out(lc,0.05f,xx-0.25f-0.025f,yy+-0.25f-0.025f,0.f,"3");
+        letters_out(lc,0.05f,xx-0.25f-0.025f,yy+0.25f-0.025f,0.f,"0");
+			
+	 xx=0.66666;
+	 yy=-0.66666;
+        letters_out(lc,0.05f,xx-0.025f,yy-0.025f,0.f,"2");
+        letters_out(lc,0.05f,xx+0.25f-0.025f,yy+0.25f-0.025f,0.f,"3");
+        letters_out(lc,0.05f,xx+0.25f-0.025f,yy+-0.25f-0.025f,0.f,"4");
+        letters_out(lc,0.05f,xx-0.25f-0.025f,yy+-0.25f-0.025f,0.f,"0");
+        letters_out(lc,0.05f,xx-0.25f-0.025f,yy+0.25f-0.025f,0.f,"1");
+			
+	 xx=-0.66666;
+	 yy=-0.66666;
+        letters_out(lc,0.05f,xx-0.025f,yy-0.025f,0.f,"3");
+        letters_out(lc,0.05f,xx+0.25f-0.025f,yy+0.25f-0.025f,0.f,"4");
+        letters_out(lc,0.05f,xx+0.25f-0.025f,yy+-0.25f-0.025f,0.f,"0");
+        letters_out(lc,0.05f,xx-0.25f-0.025f,yy+-0.25f-0.025f,0.f,"1");
+        letters_out(lc,0.05f,xx-0.25f-0.025f,yy+0.25f-0.025f,0.f,"2");
+	
+	 xx=-0.66666;
+	 yy=0.66666;
+        letters_out(lc,0.05f,xx-0.025f,yy-0.025f,0.f,"4");
+        letters_out(lc,0.05f,xx+0.25f-0.025f,yy+0.25f-0.025f,0.f,"0");
+        letters_out(lc,0.05f,xx+0.25f-0.025f,yy+-0.25f-0.025f,0.f,"1");
+        letters_out(lc,0.05f,xx-0.25f-0.025f,yy+-0.25f-0.025f,0.f,"2");
+        letters_out(lc,0.05f,xx-0.25f-0.025f,yy+0.25f-0.025f,0.f,"3");
+			
+	
+	
         glfwSwapBuffers(window);
     }
     glDeleteBuffers(1, &vbo);
     glfwTerminate();
     return EXIT_SUCCESS;
 }
+
+
+
+
