@@ -433,6 +433,8 @@ GLint common_get_shader_program(const char *vertex_shader_source, const char *fr
 GLfloat *old[5];
 GLfloat *neww[5];
 
+GLfloat voo[15][5][5];
+GLfloat vnn[15][5][5];
 
 GLfloat deltas[3*5];
 double oldx,oldy;
@@ -471,8 +473,9 @@ oldx=0.;
 oldy=0.;
 newx=0.;
 newy=0.;
-dist=0.6666666;
-float sdist = 0.25;
+dist=0.66666666666666;
+float sdist = dist*0.25;
+float hdist = dist*0.5;
 {  int i;
   for (i=0;i<3;i++) {
     unsigned long offset = i*3;
@@ -480,28 +483,36 @@ float sdist = 0.25;
     pold[0+offset]+=oldx;
     pold[1+offset]+=oldy;
     pold[2+offset]+=0.;
+    
+    set_origin_in_context(0,vos[i*5]],(double)pold[0+offset],(double)pold[1+offset],(double)pold[2+offset],dist);
 
     pold = old[1];
     pold[0+offset]+=dist-sdist;  
     pold[1+offset]+=dist+sdist; 
     pold[2+offset]+=dist;
    
+    set_origin_in_context(0,vos[i*5+1]],(double)pold[0+offset],(double)pold[1+offset],(double)pold[2+offset],dist);
+    
     pold=old[2];
     pold[0+offset]+=dist-sdist;
     pold[1+offset]+=(-dist-sdist);
     pold[2+offset]+=0.;
    
+    set_origin_in_context(0,vos[i*5+2]],(double)pold[0+offset],(double)pold[1+offset],(double)pold[2+offset],dist);
+    
     pold = old[3];
     pold[0+offset]+=(-dist+sdist); 
     pold[1+offset]+=(-dist-sdist);
     pold[2+offset]+=0.;
      
+    set_origin_in_context(0,vos[i*5+3]],(double)pold[0+offset],(double)pold[1+offset],(double)pold[2+offset],dist);
+    
     pold = old[4];   
     pold[0+offset]+=(-dist+sdist);
     pold[1+offset]+=(dist+sdist);
     pold[2+offset]+=0.;
-    }     
-  }       
+    
+    set_origin_in_context(0,vos[i*5+4]],(double)pold[0+offset],(double)pold[1+offset],(double)pold[2+offset],dist);
 
 {
   int i,j;
@@ -513,6 +524,8 @@ float sdist = 0.25;
   }
 }
 
+float vos[5][5];
+
   
 int step() {      
 int i; for (i=0;i<5;i++) {
@@ -520,6 +533,7 @@ int i; for (i=0;i<5;i++) {
     old[i][j]=neww[i][j];
     }
   }
+{  
   int count=0;
   int x,y;
   double offx;
@@ -538,10 +552,11 @@ int i; for (i=0;i<5;i++) {
     count++;
     if ((neww[0][0]+offx>0.300)||(neww[0][0]+offx<= -0.300)) {count=0;continue;}
     if ((neww[0][1]+offy>0.300)||(neww[0][1]+offy<= -0.300)) {count=0;continue;}
-    
+
+    int context=0;    
     for (unsigned long i=0;i<9;i+=3) {
-      neww[0][i+0] +=  offx;
-      neww[0][i+1] +=  offy;
+      neww[context][i+0] +=  offx;
+      neww[context][i+1] +=  offy;
       }
     break;
     }
@@ -566,7 +581,8 @@ int i; for (i=0;i<5;i++) {
 ,neww[0][6],neww[0][7],neww[1][6],neww[1][7],neww[2][6],neww[2][7],neww[3][6],neww[3][7],neww[4][6],neww[4][7]);
 
   
-fprintf(stderr,"\n\n");
+  fprintf(stderr,"\n\n");
+  }
 }
 
 
