@@ -368,6 +368,38 @@ static const GLfloat svertices[] = {
      0.2f, -0.2f, 0.0f,
     -0.2f, -0.2f, 0.0f,
 };
+ static GLfloat vertices2[] = {
+     0.0f,  0.2f, 0.0f,
+     0.2f, -0.2f, 0.0f,
+    -0.2f, -0.2f, 0.0f,
+     0.0f,  0.2f, 0.0f,
+     0.2f, -0.2f, 0.0f,
+    -0.2f, -0.2f, 0.0f,
+     0.0f,  0.2f, 0.0f,
+     0.2f, -0.2f, 0.0f,
+    -0.2f, -0.2f, 0.0f,
+     0.0f,  0.2f, 0.0f,
+     0.2f, -0.2f, 0.0f,
+    -0.2f, -0.2f, 0.0f,
+     0.0f,  0.2f, 0.0f,
+     0.2f, -0.2f, 0.0f,
+    -0.2f, -0.2f, 0.0f,
+     0.0f,  0.2f, 0.0f,
+     0.2f, -0.2f, 0.0f,
+    -0.2f, -0.2f, 0.0f,
+     0.0f,  0.2f, 0.0f,
+     0.2f, -0.2f, 0.0f,
+    -0.2f, -0.2f, 0.0f,
+     0.0f,  0.2f, 0.0f,
+     0.2f, -0.2f, 0.0f,
+    -0.2f, -0.2f, 0.0f,
+     0.0f,  0.2f, 0.0f,
+     0.2f, -0.2f, 0.0f,
+    -0.2f, -0.2f, 0.0f,
+     0.0f,  0.2f, 0.0f,
+     0.2f, -0.2f, 0.0f,
+    -0.2f, -0.2f, 0.0f,
+};
 
 const  static GLfloat lines[] = {
      -0.99f,  -0.3333f,0.f,
@@ -446,11 +478,9 @@ double newx,newy;
 GLfloat *deltaz[5]={deltas,deltas+3,deltas+6,deltas+9,deltas+12};
 
 
-//float vos[5][5];
-
 int step_init () {
-GLfloat *olds= vertices;
-GLfloat *news= vertices+(3l*3l*5l); /* points per pixel *  number of points per triangle  Times number of triangle repeats */
+GLfloat *olds= vertices2;
+GLfloat *news= vertices;
 
 unsigned long dfactor;
 dfactor=3l;
@@ -473,81 +503,49 @@ neww[3]=news+3l*factor;
 neww[4]=news+4l*factor;
 for (int i=0;i<3*3*10;i++) {
   vertices[i]=svertices [i]* 0.1;
+  vertices2[i]=svertices [i]* 0.1;
   }
 oldx=0.;
 oldy=0.;
 newx=0.;
 newy=0.;
 
-float sdist = dist*0.25;
-float hdist = dist*0.5;
-{  int i;
-  for (i=0;i<3;i++) {
-    unsigned long offset = i*3;
-    GLfloat *pold = old[0];
-    pold[0+offset]+=oldx;
-    pold[1+offset]+=oldy;
-    pold[2+offset]+=0.;
-    
-    //set_from_xyz_in_context(0,vos[i*5],pold[0+offset],pold[1+offset],pold[2+offset],dist);
 
-    pold = old[1];
-    pold[0+offset]+=dist-sdist;  
-    pold[1+offset]+=dist+sdist; 
-    pold[2+offset]+=dist;
-   
-    //set_origin_in_context(0,vos[i*5+1],pold[0+offset],pold[1+offset],pold[2+offset],dist);
-    
-    pold=old[2];
-    pold[0+offset]+=dist-sdist;
-    pold[1+offset]+=(-dist-sdist);
-    pold[2+offset]+=0.;
-   
-    //set_origin_in_context(0,vos[i*5+2],pold[0+offset],pold[1+offset],pold[2+offset],dist);
-    
-    pold = old[3];
-    pold[0+offset]+=(-dist+sdist); 
-    pold[1+offset]+=(-dist-sdist);
-    pold[2+offset]+=0.;
-     
-    //set_origin_in_context(0,vos[i*5+3],pold[0+offset],pold[1+offset],pold[2+offset],dist);
-    
-    pold = old[4];   
-    pold[0+offset]+=(-dist+sdist);
-    pold[1+offset]+=(dist+sdist);
-    pold[2+offset]+=0.;
-    
-    //set_origin_in_context(0,vos[i*5+4],pold[0+offset],pold[1+offset],pold[2+offset],dist);
-    }
-  }
+}
+
+
+
+static  int count=0;
+
+static  double offsetx=0.;
+static double offsety=0.;
+static double offsetz=0.;
+static  double offx=0.;
+static double offy=0.;
+static double offz=0.;
+
+  
+int step() {      
+
+
+dist=0.6666666666666666;
+
+int factor=9;
 
 {
   int i,j;
   for (i=0;i<5;i++) {
-    for (j=0;j<factor;j++) {
+    for(j=0;j<9;j++) {
       neww[i][j]=old[i][j];
       }
     }
   }
-}
 
 
-  
-int step() {      
-int i; for (i=0;i<5;i++) {
-  for (int j=0;j<9;j++) {
-    old[i][j]=neww[i][j];
-    }
-  }
-{  
-  int count=0;
-    int context=0;    
+int context=0;    
+{ 
   int x,y,z;
-  double offx;
-  double offy;
-  double offz;
   while (1) {
-      fprintf(stderr,"%d\n",count);
     if ((count&7)==0) {
 //      fprintf(stderr,"r");
       x = rand();
@@ -556,23 +554,55 @@ int i; for (i=0;i<5;i++) {
       offx=( ((double)(x % 50)) )-25.;
       offy=( ((double)(y % 50)) )-25.;
       offz=( ((double)(z % 50)) )-25.;
-      offx = offx/800.;
-      offy=offy/800.;
-      offz=offz/800.;
+      offx = offx/1500.;
+      offy=offy/1500.;
+      offz=offz/1500.;
+      offz = 0.;
       }
     count++;
-    if ((neww[context][0]+offx>0.300)||(neww[context][0]+offx<= -0.300)) {count=0;continue;}
-    if ((neww[context][1]+offy>0.300)||(neww[context][1]+offy<= -0.300)) {count=0;continue;}
+    if ((neww[context][0]+offsetx+offx>0.300)||(neww[context][0]+offsetx+offx<= -0.300)) {count=0;continue;}
+    if ((neww[context][1]+offsety+offy>0.300)||(neww[context][1]+offsety+offy<= -0.300)) {count=0;continue;}
     if ((neww[context][2]+offz>0.300)||(neww[context][2]+offz<= -0.300)) {count=0;continue;}
+    offsetx += offx;
+    offsety += offy;
+    offsetz += offz;
 
     for (unsigned long i=0;i<9;i+=3) {
-      neww[context][i+0] +=  offx;
-      neww[context][i+1] +=  offy;
-      neww[context][i+2] +=  offz;
+      neww[context][i+0] +=  offsetx;
+      neww[context][i+1] +=  offsety;
+      neww[context][i+2] +=  offsetz;
       }
     break;
     }
-  compute_superpos_vertices(context,neww,3,dist);
+  
+  
+
+
+  
+for (int newi=0;newi<3;newi++) {
+  fprintf(stderr,"newi %d\n",newi);
+  unsigned long offset = 3*newi;
+  
+  super_point p = (super_point){xyz:{neww[0][offset],neww[0][offset+1],neww[0][offset+2]}};  
+  for (unsigned long i=0;i<5;i++) {
+    super_point p1 = p;
+
+    super_point p2 = xyz_from_context_to_context(context,dist,
+	                          p1,
+				                          i);
+    fprintf(stderr,"suerpoint  %f,%f to %f,%f \n\n",p1.xyz[0],p1.xyz[1],p2.xyz[0],p2.xyz[1]);
+    p2.xyz[0] += changex[i];							    
+    p2.xyz[1] += changey[i];							    
+//    fprintf(stderr,"context %ld from %f,%f to %f,%f with changey %f\n",i,p.xyz[0],p.xyz[1],p1.xyz[0],p1.xyz[1],changey[i]);
+    
+    neww[i][offset] = p2.xyz[0];
+    neww[i][offset+1] = p2.xyz[1];
+    neww[i][offset+2] = p2.xyz[2];
+    }
+  }
+  
+/*
+
   fprintf(stderr,
 "p0	%f,%f %f,%f	 %f,%f	%f,%f	%f,%f -->\n"
 ,old[0][0],old[0][1],old[1][0],old[1][1],old[2][0],old[2][1],old[3][0],old[3][1],old[4][0],old[4][1]);
@@ -588,10 +618,7 @@ int i; for (i=0;i<5;i++) {
   fprintf(stderr,
 "p2	%f,%f %f,%f	 %f,%f	%f,%f	%f,%f -->\n"
 ,old[0][3],old[0][4],old[1][3],old[1][4],old[2][3],old[2][4],old[3][3],old[3][4],old[4][3],old[4][4]);
-  fprintf(stderr,
-"p2n	%f,%f %f,%f	 %f,%f	%f,%f	%f,%f\n"
-,neww[0][6],neww[0][7],neww[1][6],neww[1][7],neww[2][6],neww[2][7],neww[3][6],neww[3][7],neww[4][6],neww[4][7]);
-
+*/
   
   fprintf(stderr,"\n\n");
   }
@@ -668,11 +695,21 @@ int main(void) {
     glVertexAttribPointer(mPositionHandle, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
    glEnableVertexAttribArray(mPositionHandle);
         checkGlError("glBundBuffervbovab");
-	 
+	 /*
+	vertices[0]=-1.;
+	vertices[1]=1;
+	vertices[2]=1;
+	vertices[3]=0;
+	vertices[4]=2;
+	vertices[5]=1.1;
+	vertices[6]=0.22;
+	vertices[7]=-0,6;
+	vertices[8]=-0.4; 
+	 */
         glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
         checkGlError("blbufferdatavbo");
 	
-        glDrawArrays(GL_TRIANGLES, 0, 6);
+        glDrawArrays(GL_TRIANGLES, 0, 9);
         checkGlError("gradtriangles");
 
 	fprintf(stderr,"vbo %f,%f,%f,%f,%f,%f,%f,%f,%f\n",vertices[0],vertices[1],vertices[2],
