@@ -51,7 +51,7 @@ GLfloat *neww[5]= {news,news+3,news+6,news+9,news+12};
 GLfloat deltas[5];
 GLfloat *deltaz[5]={deltas+0,deltas+1,deltas+2,deltas+3,deltas+4};
 
-int main () {
+int main2 () {
 double oldx,oldy;
 double newx,newy;
 oldx=0.;
@@ -111,8 +111,8 @@ while (1) {
     neww[0][1] -=  offy;  
     continue;
     }
-
-  compute_superpos_vertices(old,neww,1,deltaz);
+  int context=0;
+  compute_superpos_vertices(context,neww,1,dist);
   fprintf(stderr,
 "	%f,%f %f,%f	 %f,%f	%f,%f	%f,%f -->\n"
 ,old[0][0],old[0][1],old[1][0],old[1][1],old[2][0],old[2][1],old[3][0],old[3][1],old[4][0],old[4][1]);
@@ -129,3 +129,39 @@ int i; for (i=0;i<5;i++) {
 fprintf(stderr,"\n");
   } // while
 }
+
+
+
+int main() {
+double dist=2.0;
+super_point from = {xyz:{0,0.0,0.4}};
+super_point to = {xyz:{0.,0.0,0.4}};
+
+for (int i=0;i<10;i++) {
+from.xyz[0] = (float)i * 0.10;
+
+
+to =xyz_from_context_to_context(0,(float)dist,from,0);
+fprintf(stderr,"to %f,%f,%f\n\n\n",to.xyz[0],to.xyz[1],to.xyz[2]);
+
+to =xyz_from_context_to_context(0,(float)dist,from,1);
+fprintf(stderr,"to %f,%f,%f\n\n\n",to.xyz[0],to.xyz[1],to.xyz[2]);
+
+to =xyz_from_context_to_context(0,(float)dist,from,2);
+fprintf(stderr,"to %f,%f,%f\n\n\n",to.xyz[0],to.xyz[1],to.xyz[2]);
+
+to =xyz_from_context_to_context(0,(float)dist,from,3);
+fprintf(stderr,"to %f,%f,%f\n\n\n",to.xyz[0],to.xyz[1],to.xyz[2]);
+
+to =xyz_from_context_to_context(0,(float)dist,from,4);
+fprintf(stderr,"to %f,%f,%f\n\n\n\n",to.xyz[0],to.xyz[1],to.xyz[2]);
+}
+
+
+
+
+}
+
+
+
+

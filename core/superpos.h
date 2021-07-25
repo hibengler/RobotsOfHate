@@ -9,10 +9,10 @@ for analysis and such.
 Some images might be ghosted, so the ghost coordinates are not directly provided.
 
 this has very little dependencies. */
-
+#ifndef SUPERPOS_H
+#define SUPERPOS_H
 
 #include "hateglue.h"
-
 
 
 
@@ -56,7 +56,7 @@ float z;
 
 typedef struct expanded_superpos {
 float d[5][5]; /* distance from every point to every other point */
-};	    
+} expanded_superpos;	    
 		        
 	    
 /*
@@ -76,13 +76,9 @@ It was written this way to be more compatible with opengles.
 
 
 
-extern void compute_superpos_vertices(
-  float **old_vertex[5], /* old verteces for screen 0,1,2,3,4 , or null if 0, but that doesnt work well */
-  float **new_vertex[5], /* new vertices for screen 0,1,2,3,4   or null if dont care? */
-int count /* number of vertices to process */
-,GLfloat *deltas[5] /* simple deltas */,
-GLfloat GLfloat *pvo[5][5],
-GLfloat *pvn[5][5],
+extern void compute_superpos_vertices(int context,
+  float *new_vertex[5], /* new vertices for screen 0,1,2,3,4 */
+int count, /* number of vertices to process */
 GLfloat dist);
 
 
@@ -91,8 +87,18 @@ extern int * superpos_map_to(int context);
 
 extern int * superpos_map_from(int context);
 
-super_point xyz_from_context_to_context (int from_context;super_point new_point; int to_context);
-super_point expanded_superpos_to_xyz_context(expanded_superpos *vn,int context);
+extern super_point xyz_from_context_to_context (int from_context,float dist,super_point new_point, int to_context);
+
+extern super_point expanded_superpos_to_xyz_context(expanded_superpos *vn,int context);
 
 
-int xyz_to_expanded_superpos(int from_context,struct superpos *vo[5][5],double x,double y,double z, double dist);
+int xyz_to_expanded_superpos(int from_context,struct expanded_superpos *exp, float dist);
+
+extern int set_from_xyz_in_context(int context,expanded_superpos *ep,super_point p, float dist);
+
+
+
+
+extern int set_from_origin_in_context(int context,expanded_superpos *ep,float dist);
+
+#endif

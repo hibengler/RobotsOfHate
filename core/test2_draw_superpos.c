@@ -1,3 +1,4 @@
+
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
@@ -27,9 +28,8 @@ static char *gVertexShaderOneColor =
                    "{                              \n"
                    "   gl_PointSize = 1.;         \n"
                    "   gl_Position = u_MVPMatrix   \n"  // gl_Position is a special variable used to store the final position.
-                   "               * vPosition;   \n"     // Multiply the vertex by the matrix to get the final point in                                                                               $
-                   "   gl_Position =    \n"  // gl_Position is a special variable used to store the final position.
-                   "                vPosition;   \n"     // Multiply the vertex by the matrix to get the final point in                                                                               $
+                   "    *   vPosition; \n"  // gl_Position is a special variable used to store the final position.
+                   "                 \n"     // Multiply the vertex by the matrix to get the final point in                                                                               $
                    "}                              \n";    // normalized screen coordinates.
 
 static char * gFragmentShaderOneColor =
@@ -275,6 +275,9 @@ int setup_graphics_for_letters_and_robots() {
         fprintf(stderr,"Could not position inn mPsoitiontable handle.\n");
         return 0;
     }
+    glUseProgram(one_color_program);
+    checkGlError("useprogram");
+    
     // letters init
     set_matrix();    
     lc = linit_context();
@@ -428,7 +431,7 @@ GLint common_get_shader_program(const char *vertex_shader_source, const char *fr
     return shader_program;
 }
 
-
+double dist=0.66666666666;
 
 GLfloat *old[5];
 GLfloat *neww[5];
@@ -439,9 +442,11 @@ GLfloat vnn[15][5][5];
 GLfloat deltas[3*5];
 double oldx,oldy;
 double newx,newy;
-double dist=0.5;
 
 GLfloat *deltaz[5]={deltas,deltas+3,deltas+6,deltas+9,deltas+12};
+
+
+//float vos[5][5];
 
 int step_init () {
 GLfloat *olds= vertices;
@@ -473,7 +478,7 @@ oldx=0.;
 oldy=0.;
 newx=0.;
 newy=0.;
-dist=0.66666666666666;
+
 float sdist = dist*0.25;
 float hdist = dist*0.5;
 {  int i;
@@ -484,35 +489,37 @@ float hdist = dist*0.5;
     pold[1+offset]+=oldy;
     pold[2+offset]+=0.;
     
-    set_origin_in_context(0,vos[i*5]],(double)pold[0+offset],(double)pold[1+offset],(double)pold[2+offset],dist);
+    //set_from_xyz_in_context(0,vos[i*5],pold[0+offset],pold[1+offset],pold[2+offset],dist);
 
     pold = old[1];
     pold[0+offset]+=dist-sdist;  
     pold[1+offset]+=dist+sdist; 
     pold[2+offset]+=dist;
    
-    set_origin_in_context(0,vos[i*5+1]],(double)pold[0+offset],(double)pold[1+offset],(double)pold[2+offset],dist);
+    //set_origin_in_context(0,vos[i*5+1],pold[0+offset],pold[1+offset],pold[2+offset],dist);
     
     pold=old[2];
     pold[0+offset]+=dist-sdist;
     pold[1+offset]+=(-dist-sdist);
     pold[2+offset]+=0.;
    
-    set_origin_in_context(0,vos[i*5+2]],(double)pold[0+offset],(double)pold[1+offset],(double)pold[2+offset],dist);
+    //set_origin_in_context(0,vos[i*5+2],pold[0+offset],pold[1+offset],pold[2+offset],dist);
     
     pold = old[3];
     pold[0+offset]+=(-dist+sdist); 
     pold[1+offset]+=(-dist-sdist);
     pold[2+offset]+=0.;
      
-    set_origin_in_context(0,vos[i*5+3]],(double)pold[0+offset],(double)pold[1+offset],(double)pold[2+offset],dist);
+    //set_origin_in_context(0,vos[i*5+3],pold[0+offset],pold[1+offset],pold[2+offset],dist);
     
     pold = old[4];   
     pold[0+offset]+=(-dist+sdist);
     pold[1+offset]+=(dist+sdist);
     pold[2+offset]+=0.;
     
-    set_origin_in_context(0,vos[i*5+4]],(double)pold[0+offset],(double)pold[1+offset],(double)pold[2+offset],dist);
+    //set_origin_in_context(0,vos[i*5+4],pold[0+offset],pold[1+offset],pold[2+offset],dist);
+    }
+  }
 
 {
   int i,j;
@@ -524,7 +531,6 @@ float hdist = dist*0.5;
   }
 }
 
-float vos[5][5];
 
   
 int step() {      
@@ -535,32 +541,38 @@ int i; for (i=0;i<5;i++) {
   }
 {  
   int count=0;
-  int x,y;
+    int context=0;    
+  int x,y,z;
   double offx;
   double offy;
+  double offz;
   while (1) {
       fprintf(stderr,"%d\n",count);
     if ((count&7)==0) {
-      fprintf(stderr,"r");
+//      fprintf(stderr,"r");
       x = rand();
       y = rand();
+      z = rand();
       offx=( ((double)(x % 50)) )-25.;
       offy=( ((double)(y % 50)) )-25.;
+      offz=( ((double)(z % 50)) )-25.;
       offx = offx/800.;
       offy=offy/800.;
+      offz=offz/800.;
       }
     count++;
-    if ((neww[0][0]+offx>0.300)||(neww[0][0]+offx<= -0.300)) {count=0;continue;}
-    if ((neww[0][1]+offy>0.300)||(neww[0][1]+offy<= -0.300)) {count=0;continue;}
+    if ((neww[context][0]+offx>0.300)||(neww[context][0]+offx<= -0.300)) {count=0;continue;}
+    if ((neww[context][1]+offy>0.300)||(neww[context][1]+offy<= -0.300)) {count=0;continue;}
+    if ((neww[context][2]+offz>0.300)||(neww[context][2]+offz<= -0.300)) {count=0;continue;}
 
-    int context=0;    
     for (unsigned long i=0;i<9;i+=3) {
       neww[context][i+0] +=  offx;
       neww[context][i+1] +=  offy;
+      neww[context][i+2] +=  offz;
       }
     break;
     }
-  compute_superpos_vertices(old,neww,3,deltaz);
+  compute_superpos_vertices(context,neww,3,dist);
   fprintf(stderr,
 "p0	%f,%f %f,%f	 %f,%f	%f,%f	%f,%f -->\n"
 ,old[0][0],old[0][1],old[1][0],old[1][1],old[2][0],old[2][1],old[3][0],old[3][1],old[4][0],old[4][1]);
@@ -648,6 +660,8 @@ int main(void) {
         glUseProgram(one_color_program);
 	checkGlError("useprogram");
         glUniform4f(colorHandle, 0.8f,0.7f,0.3f,1.0f);
+    set_matrix();    
+	checkGlError("mat2");
 
 	glBindBuffer(GL_ARRAY_BUFFER, vbo);	
         checkGlError("glBundBuffervbo");
@@ -688,8 +702,8 @@ int main(void) {
 	float yy=0.66666;
         letters_out(lc,0.05f,xx-0.025f,yy-0.025f,0.f,"1");
         letters_out(lc,0.05f,xx+0.166666666f-0.025f,yy+0.166666666f-0.025f,0.f,"2");
-        letters_out(lc,0.05f,xx+0.166666666f-0.025f,yy+-0.166666666f-0.025f,0.f,"4");
-        letters_out(lc,0.05f,xx-0.166666666f-0.025f,yy+-0.166666666f-0.025f,0.f,"3");
+        letters_out(lc,0.05f,xx+0.166666666f-0.025f,yy+-0.166666666f-0.025f,0.f,"3");
+        letters_out(lc,0.05f,xx-0.166666666f-0.025f,yy+-0.166666666f-0.025f,0.f,"4");
         letters_out(lc,0.05f,xx-0.166666666f-0.025f,yy+0.166666666f-0.025f,0.f,"0");
 			
 	 xx=0.66666;
@@ -724,6 +738,9 @@ int main(void) {
     glfwTerminate();
     return EXIT_SUCCESS;
 }
+
+
+
 
 
 
