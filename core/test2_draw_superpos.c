@@ -477,6 +477,8 @@ double newx,newy;
 
 GLfloat *deltaz[5]={deltas,deltas+3,deltas+6,deltas+9,deltas+12};
 
+static float changex[5];
+static float changey[5];
 
 int step_init () {
 GLfloat *olds= vertices2;
@@ -511,6 +513,42 @@ newx=0.;
 newy=0.;
 
 
+
+float sdist = dist*0.25;
+float hdist = dist*0.5;
+
+//static float sdist = dist*0.55;
+//float hdist = dist*0.1;
+{ float dist=0.5;
+float sdist = dist * 0.25;
+changex[0] = 0;
+changey[0]=0.;
+changex[1] =(dist-sdist);
+changex[1]=dist+sdist;
+changey[1] =dist-sdist;
+changex[1] =0.;
+changex[2]=dist-sdist;
+changey[2]=(-dist-sdist);
+changex[3]=(-dist+sdist);
+changey[3]=(-dist-sdist);
+changex[4]=(-dist+sdist);
+changey[4]=(dist+sdist);
+
+
+/*original:
+changex[0] = 0;
+changey[0]=0.;
+changex[1] =(dist-sdist);
+changey[1] =dist+sdist;
+changex[2]=dist-sdist;
+changey[2]=(-dist-sdist);
+changex[3]=(-dist+sdist);
+changey[3]=(-dist-sdist);
+changex[4]=(-dist+sdist);
+changey[4]=(dist+sdist);
+*/
+}
+
 }
 
 
@@ -524,11 +562,18 @@ static  double offx=0.;
 static double offy=0.;
 static double offz=0.;
 
+
+
+
+
+
+
+
+
   
 int step() {      
 
 
-dist=0.6666666666666666;
 
 int factor=9;
 
@@ -567,10 +612,12 @@ int context=0;
     offsety += offy;
     offsetz += offz;
 
-    for (unsigned long i=0;i<9;i+=3) {
-      neww[context][i+0] +=  offsetx;
-      neww[context][i+1] +=  offsety;
-      neww[context][i+2] +=  offsetz;
+     for(int yy=0;yy<5;yy++) {
+       for (unsigned long i=0;i<9;i+=3) {
+         neww[yy][i+0] +=  offsetx;
+         neww[yy][i+1] +=  offsety;
+         neww[yy][i+2] +=  offsetz;
+         }
       }
     break;
     }
@@ -583,17 +630,19 @@ for (int newi=0;newi<3;newi++) {
   fprintf(stderr,"newi %d\n",newi);
   unsigned long offset = 3*newi;
   
-  super_point p = (super_point){xyz:{neww[0][offset],neww[0][offset+1],neww[0][offset+2]}};  
   for (unsigned long i=0;i<5;i++) {
+    super_point p = (super_point){xyz:{neww[i][offset],neww[i][offset+1],neww[i][offset+2]}};  
     super_point p1 = p;
+//    p1.xyz[0] += changex[i];							    
+//    p1.xyz[1] += changey[i];							    
 
     super_point p2 = xyz_from_context_to_context(context,dist,
 	                          p1,
 				                          i);
     fprintf(stderr,"suerpoint  %f,%f to %f,%f \n\n",p1.xyz[0],p1.xyz[1],p2.xyz[0],p2.xyz[1]);
-    p2.xyz[0] += changex[i];							    
-    p2.xyz[1] += changey[i];							    
-//    fprintf(stderr,"context %ld from %f,%f to %f,%f with changey %f\n",i,p.xyz[0],p.xyz[1],p1.xyz[0],p1.xyz[1],changey[i]);
+      p2.xyz[0] += changex[i];							    
+      p2.xyz[1] += changey[i];							    
+    fprintf(stderr,"context %ld from %f,%f to %f,%f with changey %f\n",i,p.xyz[0],p.xyz[1],p1.xyz[0],p1.xyz[1],changey[i]);
     
     neww[i][offset] = p2.xyz[0];
     neww[i][offset+1] = p2.xyz[1];
