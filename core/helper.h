@@ -1,3 +1,6 @@
+#ifndef HELPER_DOT_H
+#define HELPER_DOT_H
+
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
@@ -7,7 +10,7 @@
 
 
 #include "superpos.h"
-
+#include "larry_harvey_has_a_possee.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -36,3 +39,12 @@ extern int checkGlError3(const char *filename,int lineno,const char* op);
 
 extern void printGLString(const char *name, GLenum s);
 
+
+void multMatrix(glMatrix *result, glMatrix *srcA, glMatrix *srcB);
+void loadIdentity(glMatrix *result);
+void translateMatrix(glMatrix *result, GLfloat x,GLfloat y,GLfloat z);
+void translateMatrix2(glMatrix *result, GLfloat x,GLfloat y,GLfloat z);
+void scaleMatrix(glMatrix *result, GLfloat sx, GLfloat sy, GLfloat sz);
+void set_matrix_translate(GLfloat centerx,GLfloat centery);
+
+#endif

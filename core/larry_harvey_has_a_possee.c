@@ -7,19 +7,21 @@
 #define LARRY_GLES_2_DIRECT 1
 
 #ifdef LARRY_GLES_2_DIRECT
-#include "larry_gles2_shim.h"
+#include "letters_render_opengles2.h"
+//#include "helper.h"
+
 #else
 //#include "raylib.h"
 //#include "rlgl.h"
 
 #endif
-#include "not_rl.h"
+#include "mini_not_rl.h"
 #include "larry_harvey_has_a_possee.h"
 
 
 
 
-#define CLITERAL NOT_RL_CLITERAL
+//#define CLITERAL NOT_RL_CLITERAL
 
 
 

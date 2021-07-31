@@ -29,7 +29,7 @@ extern void lg_wide_line(lp p1,lp p2,fl line_width);
 
 extern unsigned int letters_opengles_color_handle();
 extern unsigned int letters_opengles_program_handle();
-
+extern unsigned int letters_opengles_position_handle();
 
 
 #endif

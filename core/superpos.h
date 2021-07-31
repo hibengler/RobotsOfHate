@@ -55,7 +55,7 @@ float z;
 } context_point;
 
 typedef struct expanded_superpos {
-float d[5][5]; /* distance from every point to every other point */
+double d[5][5]; /* distance from every point to every other point */
 } expanded_superpos;	    
 		        
 	    

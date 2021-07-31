@@ -10,11 +10,12 @@
 #endif
 
 //#include "raylib.h"
-#include "not_rl.h"
+#include "mini_not_rl.h"
 typedef not_rl_Color Color;
 typedef not_rl_Rectangle Rectangle;
 typedef not_rl_Vector2 Vector2;
 typedef not_rl_Vector3 Vector3;
+#define CLITERAL NOT_RL_CLITERAL
 #define BLACK      CLITERAL{ 0, 0, 0, 255 }         // Black
 #define WHITE      CLITERAL{ 255, 255, 255, 255 }   // White
 typedef enum { false, true } bool;

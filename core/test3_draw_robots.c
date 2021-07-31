@@ -5,10 +5,13 @@
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
-
+#include <unistd.h>
+       
 
 #include "superpos.h"
-
+#include "helper.h"
+#include "onecolor_specs.h"
+#include "player.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -40,65 +43,18 @@ static char * gFragmentShaderOneColor =
         "}\n";
 
 
+onecolor_specs onecs;
+onecolor_specs *onec=&onecs;
+hate_game  the_hate_game;
 
-static GLuint do_effect=0;
-static GLuint one_color_program=0;
-static GLuint gvPositionHandle=0;
-static GLint mPositionHandle=0;
-static GLint mMVPMatrixHandle=0;
-
-static glMatrix modelMatrix;
-static glMatrix effectMatrix; /* used to do effects like zoom near/zoom away */
-static glMatrix viewMatrix;
-static glMatrix projectionMatrix;
-static glMatrix MVMatrix;
-static glMatrix MVPMatrix; // effective matrix for the menu - might be spinning in space.
-
-glMatrix origin_matrix;  // matrix tha makes x from -1 to 1, y from -1 to 1.  X or y might be bigger depending on orientation
-
-
-static int colorHandle;   
-
-
-
-
-static void multMatrix(glMatrix *result, glMatrix *srcA, glMatrix *srcB)
-{
-    glMatrix    tmp;
-    int         i;
-
-    for (i=0; i<4; i++)
-    {
-        tmp.mat[i][0] = (srcA->mat[i][0] * srcB->mat[0][0]) +
-                        (srcA->mat[i][1] * srcB->mat[1][0]) +
-                        (srcA->mat[i][2] * srcB->mat[2][0]) +
-                        (srcA->mat[i][3] * srcB->mat[3][0]) ;
-
-        tmp.mat[i][1] = (srcA->mat[i][0] * srcB->mat[0][1]) +
-                        (srcA->mat[i][1] * srcB->mat[1][1]) +
-                        (srcA->mat[i][2] * srcB->mat[2][1]) +
-                        (srcA->mat[i][3] * srcB->mat[3][1]) ;
-
-        tmp.mat[i][2] = (srcA->mat[i][0] * srcB->mat[0][2]) +
-                        (srcA->mat[i][1] * srcB->mat[1][2]) +
-                        (srcA->mat[i][2] * srcB->mat[2][2]) +
-                        (srcA->mat[i][3] * srcB->mat[3][2]) ;
-
-        tmp.mat[i][3] = (srcA->mat[i][0] * srcB->mat[0][3]) +
-                        (srcA->mat[i][1] * srcB->mat[1][3]) +
-                        (srcA->mat[i][2] * srcB->mat[2][3]) +
-                        (srcA->mat[i][3] * srcB->mat[3][3]) ;
-    }
-    memcpy(result, &tmp, sizeof(glMatrix));
-}
 
 
 
 static void set_origin_matrix() {
 // no effect origin matrix
-glMatrix mvmatrix;
-multMatrix(&mvmatrix,&modelMatrix,&viewMatrix);
-multMatrix(&origin_matrix,&mvmatrix,&projectionMatrix);
+glMatrix tempMVMatrix;
+multMatrix(&tempMVMatrix,&onec->modelMatrix,&onec->viewMatrix);
+multMatrix(&onec->origin_matrix,&tempMVMatrix,&onec->projectionMatrix);
 }   
 
 
@@ -106,93 +62,27 @@ static void set_matrix() {
       
     glMatrix *xmatrix;
     glMatrix stageMatrix;
-    if (do_effect) {
-      multMatrix(&stageMatrix,&modelMatrix,&effectMatrix);
+    if (onec->do_effect) {
+      multMatrix(&stageMatrix,&onec->modelMatrix,&onec->effectMatrix);
       xmatrix = &stageMatrix;
       }
     else {  
-      xmatrix = &modelMatrix;
+      xmatrix = &onec->modelMatrix;
       }
-    multMatrix(&MVMatrix,xmatrix,&viewMatrix);
-    multMatrix(&MVPMatrix,&MVMatrix,&projectionMatrix);
+    multMatrix(&onec->MVMatrix,xmatrix,&onec->viewMatrix);
+    multMatrix(&onec->MVPMatrix,&onec->MVMatrix,&onec->projectionMatrix);
     
     
     // Apply the projection and view transformation
-    glUniformMatrix4fv(mMVPMatrixHandle, 1, GL_FALSE, (GLfloat *)(&MVPMatrix));
+    glUniformMatrix4fv(onec->
+   mMVPMatrixHandle, 1, GL_FALSE, (GLfloat *)(&onec->MVPMatrix));
    checkGlError("setmatrix");
 }       
     
     
-static void loadIdentity(glMatrix *result)
-{
-    memset(result, 0x0, sizeof(glMatrix));
-    result->mat[0][0] = 1.0f;
-    result->mat[1][1] = 1.0f;
-    result->mat[2][2] = 1.0f;
-    result->mat[3][3] = 1.0f;
-}
-                        
-void translateMatrix(glMatrix *result, GLfloat x,GLfloat y,GLfloat z) {
-        glMatrix transmat;
-    //memset(transmat, 0x0, sizeof(glMatrix));
-    loadIdentity(&transmat);
-
-     transmat.mat[3][0] = x;
-     transmat.mat[3][1] = y;
-     transmat.mat[3][2] = z;
-     transmat.mat[3][3] = 1.0f;
-/*
-      transmat.mat[0][3] = x;
-     transmat.mat[1][3] = y;
-     transmat.mat[2][3] = z;
-     transmat.mat[3][3] = 1.0f;
-*/
-                        
-    multMatrix( result, &transmat, result );
-}
-
-void translateMatrix2(glMatrix *result, GLfloat x,GLfloat y,GLfloat z) {
-        glMatrix transmat;
-    //memset(transmat, 0x0, sizeof(glMatrix));
-    loadIdentity(&transmat);
-/*
-     transmat.mat[3][0] = x;
-     transmat.mat[3][1] = y;
-     transmat.mat[3][2] = z;
-     transmat.mat[3][3] = 1.0f;
-*/
-      transmat.mat[0][3] = x;
-     transmat.mat[1][3] = y;
-     transmat.mat[2][3] = z;
-     transmat.mat[3][3] = 1.0f;
- 
-    
-    multMatrix( result, &transmat, result );
-}
-
-                        
-void scaleMatrix(glMatrix *result, GLfloat sx, GLfloat sy, GLfloat sz)
-{
-    result->mat[0][0] *= sx;
-    result->mat[0][1] *= sx;
-    result->mat[0][2] *= sx;
-    result->mat[0][3] *= sx;
-
-    result->mat[1][0] *= sy;
-    result->mat[1][1] *= sy;
-    result->mat[1][2] *= sy;
-    result->mat[1][3] *= sy;
-    
-    result->mat[2][0] *= sz;
-    result->mat[2][1] *= sz;
-    result->mat[2][2] *= sz;
-    result->mat[2][3] *= sz;
-}
-    
-    
-static void set_matrix_translate(GLfloat centerx,GLfloat centery) {
-    loadIdentity(&modelMatrix);
-    translateMatrix(&modelMatrix,centerx,centery,0.f);
+void set_matrix_translate(GLfloat centerx,GLfloat centery) {
+    loadIdentity(&onec->modelMatrix);
+    translateMatrix(&onec->modelMatrix,centerx,centery,0.f);
 set_matrix();
 }          
          
@@ -243,45 +133,47 @@ return checkGlError(buf);
 }
 
 int setup_graphics_for_letters_and_robots() {
-
-    loadIdentity(&modelMatrix);
-    loadIdentity(&effectMatrix);
-    loadIdentity(&viewMatrix);
-    loadIdentity(&projectionMatrix);
+init_onecolor_specs(onec);
+    loadIdentity(&onec->modelMatrix);
+    loadIdentity(&onec->effectMatrix);
+    loadIdentity(&onec->viewMatrix);
+    loadIdentity(&onec->projectionMatrix);
         
     set_origin_matrix();
+    game_init(&the_hate_game,0); // 0 is our player id
           
-    one_color_program = common_get_shader_program(gVertexShaderOneColor,gFragmentShaderOneColor);
-    mMVPMatrixHandle = glGetUniformLocation(one_color_program, "u_MVPMatrix");
+    onec->one_color_program = common_get_shader_program(gVertexShaderOneColor,gFragmentShaderOneColor);
+    onec->mMVPMatrixHandle = glGetUniformLocation(onec->one_color_program, "u_MVPMatrix");
       if (checkGlError("glGetAttribLocation")) {
         fprintf(stderr,"Could not create matrix handle.\n");
         return 0;
-    }
-    gvPositionHandle = glGetAttribLocation(one_color_program, "vPosition");
+	 }
+    onec->gvPositionHandle = glGetAttribLocation(onec->one_color_program, "vPosition");
 
       if (    checkGlError("glGetAttribLocation")) {
         fprintf(stderr,"Could not create gv position handle.\n");
         return 0;
     }
     // get handle to fragment shader's v_Color member
-    colorHandle = glGetUniformLocation(one_color_program, "v_Color");
+    onec->colorHandle = glGetUniformLocation(onec->one_color_program, "v_Color");
 
     if (checkGlError("glGetAttribLocation")) {
         fprintf(stderr,"Could not locqtuib color handle.\n");
         return 0;
     }
-    mPositionHandle = glGetAttribLocation(one_color_program, "vPosition");
+    onec->mPositionHandle = glGetAttribLocation(onec->one_color_program, "vPosition");
     if (checkGlError("glsasGetAttribLocation")) {
         fprintf(stderr,"Could not position inn mPsoitiontable handle.\n");
         return 0;
     }
-    glUseProgram(one_color_program);
+    glUseProgram(onec->one_color_program);
     checkGlError("useprogram");
     
     // letters init
     set_matrix();    
     lc = linit_context();
-    letters_opengles_setgraphics(one_color_program,colorHandle,gvPositionHandle,mPositionHandle); // needs to be set up once, with a single color program
+    letters_opengles_setgraphics(onec->one_color_program,
+                      onec->colorHandle,onec->gvPositionHandle,onec->mPositionHandle); // needs to be set up once, with a single color program
       //once amonst all the drivers
     
            
@@ -463,7 +355,7 @@ GLint common_get_shader_program(const char *vertex_shader_source, const char *fr
     return shader_program;
 }
 
-double dist=0.66666666666;
+double dist=2.;
 
 GLfloat *old[5];
 GLfloat *neww[5];
@@ -481,73 +373,7 @@ static float changex[5];
 static float changey[5];
 
 int step_init () {
-GLfloat *olds= vertices2;
-GLfloat *news= vertices;
-
-unsigned long dfactor;
-dfactor=3l;
-deltaz[0]=deltas+0l*dfactor;
-deltaz[1]=deltas+1l*dfactor;
-deltaz[2]=deltas+2l*dfactor;
-deltaz[3]=deltas+3l*dfactor;
-deltaz[4]=deltas+4l*dfactor;
-
-unsigned long factor = 3l * 3l; /* floats per point * points * number of triangles */
-old[0]=olds;
-old[1]=olds+1l*factor;
-old[2]=olds+2l*factor;
-old[3]=olds+3l*factor;
-old[4]=olds+4l*factor;
-neww[0]=news;
-neww[1]=news+1l*factor;
-neww[2]=news+2l*factor;
-neww[3]=news+3l*factor;
-neww[4]=news+4l*factor;
-for (int i=0;i<3*3*10;i++) {
-  vertices[i]=svertices [i]* 0.1;
-  vertices2[i]=svertices [i]* 0.1;
-  }
-oldx=0.;
-oldy=0.;
-newx=0.;
-newy=0.;
-
-
-
-float sdist = dist*0.25;
-float hdist = dist*0.5;
-
-//static float sdist = dist*0.55;
-//float hdist = dist*0.1;
-{ float dist=0.5;
-float sdist = dist * 0.25;
-changex[0] = 0;
-changey[0]=0.;
-changex[1] =(dist-sdist);
-changex[1]=dist+sdist;
-changey[1] =dist-sdist;
-changex[1] =0.;
-changex[2]=dist-sdist;
-changey[2]=(-dist-sdist);
-changex[3]=(-dist+sdist);
-changey[3]=(-dist-sdist);
-changex[4]=(-dist+sdist);
-changey[4]=(dist+sdist);
-
-
-/*original:
-changex[0] = 0;
-changey[0]=0.;
-changex[1] =(dist-sdist);
-changey[1] =dist+sdist;
-changex[2]=dist-sdist;
-changey[2]=(-dist-sdist);
-changex[3]=(-dist+sdist);
-changey[3]=(-dist-sdist);
-changex[4]=(-dist+sdist);
-changey[4]=(dist+sdist);
-*/
-}
+dist=2.;
 
 }
 
@@ -575,102 +401,12 @@ int step() {
 
 
 
-int factor=9;
 
-{
-  int i,j;
-  for (i=0;i<5;i++) {
-    for(j=0;j<9;j++) {
-      neww[i][j]=old[i][j];
-      }
-    }
-  }
-
-
-int context=0;    
-{ 
-  int x,y,z;
-  while (1) {
-    if ((count&7)==0) {
-//      fprintf(stderr,"r");
-      x = rand();
-      y = rand();
-      z = rand();
-      offx=( ((double)(x % 50)) )-25.;
-      offy=( ((double)(y % 50)) )-25.;
-      offz=( ((double)(z % 50)) )-25.;
-      offx = offx/1500.;
-      offy=offy/1500.;
-      offz=offz/1500.;
-      offz = 0.;
-      }
-    count++;
-    if ((neww[context][0]+offsetx+offx>0.300)||(neww[context][0]+offsetx+offx<= -0.300)) {count=0;continue;}
-    if ((neww[context][1]+offsety+offy>0.300)||(neww[context][1]+offsety+offy<= -0.300)) {count=0;continue;}
-    if ((neww[context][2]+offz>0.300)||(neww[context][2]+offz<= -0.300)) {count=0;continue;}
-    offsetx += offx;
-    offsety += offy;
-    offsetz += offz;
-
-     for(int yy=0;yy<5;yy++) {
-       for (unsigned long i=0;i<9;i+=3) {
-         neww[yy][i+0] +=  offsetx;
-         neww[yy][i+1] +=  offsety;
-         neww[yy][i+2] +=  offsetz;
-         }
-      }
-    break;
-    }
+  game_step(&the_hate_game);
   
-  
-
-
-  
-for (int newi=0;newi<3;newi++) {
-  fprintf(stderr,"newi %d\n",newi);
-  unsigned long offset = 3*newi;
-  
-  for (unsigned long i=0;i<5;i++) {
-    super_point p = (super_point){xyz:{neww[i][offset],neww[i][offset+1],neww[i][offset+2]}};  
-    super_point p1 = p;
-//    p1.xyz[0] += changex[i];							    
-//    p1.xyz[1] += changey[i];							    
-
-    super_point p2 = xyz_from_context_to_context(context,dist,
-	                          p1,
-				                          i);
-    fprintf(stderr,"suerpoint  %f,%f to %f,%f \n\n",p1.xyz[0],p1.xyz[1],p2.xyz[0],p2.xyz[1]);
-      p2.xyz[0] += changex[i];							    
-      p2.xyz[1] += changey[i];							    
-    fprintf(stderr,"context %ld from %f,%f to %f,%f with changey %f\n",i,p.xyz[0],p.xyz[1],p1.xyz[0],p1.xyz[1],changey[i]);
-    
-    neww[i][offset] = p2.xyz[0];
-    neww[i][offset+1] = p2.xyz[1];
-    neww[i][offset+2] = p2.xyz[2];
-    }
-  }
-  
-/*
-
-  fprintf(stderr,
-"p0	%f,%f %f,%f	 %f,%f	%f,%f	%f,%f -->\n"
-,old[0][0],old[0][1],old[1][0],old[1][1],old[2][0],old[2][1],old[3][0],old[3][1],old[4][0],old[4][1]);
-  fprintf(stderr,
-"p0n	%f,%f %f,%f	 %f,%f	%f,%f	%f,%f\n"
-,neww[0][0],neww[0][1],neww[1][0],neww[1][1],neww[2][0],neww[2][1],neww[3][0],neww[3][1],neww[4][0],neww[4][1]);
-  fprintf(stderr,
-"p1	%f,%f %f,%f	 %f,%f	%f,%f	%f,%f -->\n"
-,old[0][3],old[0][4],old[1][3],old[1][4],old[2][3],old[2][4],old[3][3],old[3][4],old[4][3],old[4][4]);
-  fprintf(stderr,
-"p1n	%f,%f %f,%f	 %f,%f	%f,%f	%f,%f\n"
-,neww[0][3],neww[0][4],neww[1][3],neww[1][4],neww[2][3],neww[2][4],neww[3][3],neww[3][4],neww[4][3],neww[4][4]);
-  fprintf(stderr,
-"p2	%f,%f %f,%f	 %f,%f	%f,%f	%f,%f -->\n"
-,old[0][3],old[0][4],old[1][3],old[1][4],old[2][3],old[2][4],old[3][3],old[3][4],old[4][3],old[4][4]);
-*/
-  
+      
   fprintf(stderr,"\n\n");
-  }
+
 }
 
 
@@ -706,8 +442,8 @@ int main(void) {
 	checkGlError("b");
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
 	checkGlError("c");
-    glVertexAttribPointer(mPositionHandle, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
-   glEnableVertexAttribArray(mPositionHandle);
+    glVertexAttribPointer(onec->mPositionHandle, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
+   glEnableVertexAttribArray(onec->mPositionHandle);
 	checkGlError("d");
 	
     glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -719,8 +455,8 @@ int main(void) {
 	checkGlError("g");
     glBufferData(GL_ARRAY_BUFFER, sizeof(lines), lines, GL_STATIC_DRAW);
 	checkGlError("h");
-    glVertexAttribPointer(mPositionHandle, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
-   glEnableVertexAttribArray(mPositionHandle);
+    glVertexAttribPointer(onec->mPositionHandle, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
+   glEnableVertexAttribArray(onec->mPositionHandle);
 	checkGlError("i");
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 	checkGlError("j");
@@ -733,43 +469,22 @@ int main(void) {
 	checkGlError("clear");
 	
 	
-        glUseProgram(one_color_program);
+        glUseProgram(onec->one_color_program);
 	checkGlError("useprogram");
-        glUniform4f(colorHandle, 0.8f,0.7f,0.3f,1.0f);
+        glUniform4f(onec->colorHandle, 0.8f,0.7f,0.3f,1.0f);
+    loadIdentity(&onec->viewMatrix);
+    loadIdentity(&onec->modelMatrix);
+	
     set_matrix();    
 	checkGlError("mat2");
 
-	glBindBuffer(GL_ARRAY_BUFFER, vbo);	
-        checkGlError("glBundBuffervbo");
-    glVertexAttribPointer(mPositionHandle, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
-   glEnableVertexAttribArray(mPositionHandle);
-        checkGlError("glBundBuffervbovab");
-	 /*
-	vertices[0]=-1.;
-	vertices[1]=1;
-	vertices[2]=1;
-	vertices[3]=0;
-	vertices[4]=2;
-	vertices[5]=1.1;
-	vertices[6]=0.22;
-	vertices[7]=-0,6;
-	vertices[8]=-0.4; 
-	 */
-        glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
-        checkGlError("blbufferdatavbo");
-	
-        glDrawArrays(GL_TRIANGLES, 0, 9);
-        checkGlError("gradtriangles");
 
-	fprintf(stderr,"vbo %f,%f,%f,%f,%f,%f,%f,%f,%f\n",vertices[0],vertices[1],vertices[2],
-			vertices[3],vertices[4],vertices[5],
-			vertices[6],vertices[7],vertices[8]);
-    
+ 
 
         glBindBuffer(GL_ARRAY_BUFFER, vboframe);	
-        glUniform4f(colorHandle, 0.8f,1.0f,1.0f,1.0f);
-    glVertexAttribPointer(mPositionHandle, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
-   glEnableVertexAttribArray(mPositionHandle);
+        glUniform4f(onec->colorHandle, 0.8f,1.0f,1.0f,1.0f);
+    glVertexAttribPointer(onec->mPositionHandle, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
+   glEnableVertexAttribArray(onec->mPositionHandle);
         glBufferData(GL_ARRAY_BUFFER, sizeof(lines), lines, GL_STATIC_DRAW);
         glDrawArrays(GL_LINE_STRIP, 0, 12);
 
@@ -816,9 +531,12 @@ int main(void) {
         letters_out(lc,0.05f,xx-0.166666666f-0.025f,yy+-0.166666666f-0.025f,0.f,"2");
         letters_out(lc,0.05f,xx-0.166666666f-0.025f,yy+0.166666666f-0.025f,0.f,"3");
 			
-	
+        glUseProgram(onec->one_color_program);
+	checkGlError("useprogram");
+	game_draw(onec,&the_hate_game);
 	
         glfwSwapBuffers(window);
+	sleep(20000);
     }
     glDeleteBuffers(1, &vbo);
     glfwTerminate();
