@@ -118,163 +118,54 @@ for (newi=0;newi<count;newi++) {
 }
 
 
+super_point xyz_from_context_to_context (int from_context,float dist, super_point start,int to_context) {
+  int *ms;
+  ms = superpos_map_to(from_context);
+  int m0=ms[0];   
+  int m1=ms[1];
+  int m2=ms[2];
+  int m3=ms[3];
+  int m4=ms[4];
 
-
-
-
-
-
-super_point offset_by_one_context(float dist,super_point before) {
+// assume the point is from the origin x and y;
+float x=start.xyz[0];
+float y=start.xyz[1];
+float z=start.xyz[2];
 float hdist = dist*0.5;
-double p2to_1 = before.xyz[1];
-double p4to_1 = before.xyz[0];
-fprintf(stderr,"x,y is %f,%f:	",p4to_1,p2to_1);
-super_point base;
-if (p2to_1>=0) {
-  if (p4to_1>=0) {
-    base = (super_point){xyz:{-hdist,hdist,before.xyz[3]}};
-    fprintf(stderr,"0 base  %f,%f	",base.xyz[0],base.xyz[1]);
-    base.xyz[1] -= p2to_1;
-    base.xyz[0] += p4to_1;
-    }
-  else {
-    base = (super_point){xyz:{0.,dist,before.xyz[3]}};
-    fprintf(stderr,"1 base  %f,%f	",base.xyz[0],base.xyz[1]);
-    base.xyz[1] += p4to_1;
-    base.xyz[1] += p4to_1;
-    base.xyz[1] -= p2to_1;
-    base.xyz[0] -= p2to_1;
-    base.xyz[0] -= (p2to_1+p4to_1);
-    
-    }
+super_point base = (super_point){xyz:{x,y,z}};
+int number_contexts = (to_context+5-from_context) % 5;
+fprintf(stderr,"number contexts = %d pt = %f,%f\n",number_contexts,x,y);
+if (number_contexts ==0) {
   }
-else { /* y iss < 0 */
-  if (p4to_1>0) {
-    base = (super_point){xyz:{0.,hdist,before.xyz[3]}};
-    fprintf(stderr,"2 base  %f,%f	",base.xyz[0],base.xyz[1]);
-//    base.xyz[1] -= p4to_1;
-//    base.xyz[0] += p4to_1;
-    }
-  else {
-    base = (super_point){xyz:{0.,-hdist,before.xyz[3]}};
-    fprintf(stderr,"3 base  %f,%f	",base.xyz[0],base.xyz[1]);
-    base.xyz[0] -= p2to_1;
-//    base.xyz[1] -= p4to_1;
-    }
+else if (number_contexts == 1) {
+  base = (super_point){xyz:{-hdist,hdist,z}};
+  base.xyz[0] += x;
+  base.xyz[1] -= y;
   }
-  
-fprintf(stderr,"	final to %f,%f	",base.xyz[0], base.xyz[1]);
-fprintf(stderr,"		Note: original x %f,%f\n",p2to_1,p4to_1);
-
+else if (number_contexts == 2) {
+  base = (super_point){xyz:{-hdist,-hdist,z}};
+  base.xyz[0] += y;
+  base.xyz[1] += x;
+  }
+else if (number_contexts == 3) {
+  base = (super_point){xyz:{hdist,-hdist,z}};
+  base.xyz[0] -= x;
+  base.xyz[1] += y;
+  }
+else if (number_contexts == 4) {
+  base = (super_point){xyz:{hdist,hdist,z}};
+  base.xyz[0] -=y;
+  base.xyz[1] -=x;
+  }
+fprintf(stderr, "from %d to %d 	is %f,%f\n",from_context,to_context,base.xyz[0],base.xyz[1]);
 return(base);
 }
 
 
 
+
   
     
-
-
-
-
-super_point back_offset_by_one_context(float dist,super_point after) {
-float hdist = dist*0.5; // an idea to go backward 
-double p2to_1 = after.xyz[1];
-double p4to_1 = after.xyz[0];
-fprintf(stderr,"x,y is %f,%f:	",p4to_1,p2to_1);
-super_point base;
-if (p2to_1>=0) {
-  if (p4to_1>=0) {
-    base = (super_point){xyz:{hdist,hdist,after.xyz[3]}};
-    fprintf(stderr,"0 base  %f,%f	",base.xyz[0],base.xyz[1]);
-    base.xyz[1] += p2to_1;
-    base.xyz[1] += p4to_1;
-    base.xyz[0] += p4to_1;
-    
-    }
-  else {
-    base = (super_point){xyz:{0.,dist,after.xyz[3]}};
-    fprintf(stderr,"1 base  %f,%f	",base.xyz[0],base.xyz[1]);
-    base.xyz[1] += p4to_1;
-    base.xyz[1] += p4to_1;
-    base.xyz[1] -= p2to_1;
-    base.xyz[0] -= p2to_1;
-    base.xyz[0] -= (p2to_1+p4to_1);
-    
-    }
-  }
-else { /* y iss < 0 */
-  if (p4to_1>0) {
-    base = (super_point){xyz:{0.,hdist,after.xyz[3]}};
-    fprintf(stderr,"2 base  %f,%f	",base.xyz[0],base.xyz[1]);
-//    base.xyz[1] -= p4to_1;
-//    base.xyz[0] += p4to_1;
-    }
-  else {
-    base = (super_point){xyz:{0.,-hdist,after.xyz[3]}};
-    fprintf(stderr,"3 base  %f,%f	",base.xyz[0],base.xyz[1]);
-    base.xyz[0] -= p2to_1;
-//    base.xyz[1] -= p4to_1;
-    }
-  }
-  
-fprintf(stderr,"	final to %f,%f	",base.xyz[0], base.xyz[1]);
-fprintf(stderr,"		Note: original x %f,%f\n",p2to_1,p4to_1);
-
-return(base);
-}
-
-
-        
-    
-      
-	  
-super_point xyz_from_context_to_context(int from_context,float dist,super_point new_point,int to_context) {
-if ( (((from_context+1)%5)==to_context)||(((from_context+2)%5) == to_context)) {
-  for (int ci = from_context;ci!=to_context; ci = ((ci+1)%5)) {
-    fprintf(stderr,"converting %d  %f,%f	-> %d\n",ci,new_point.xyz[0],new_point.xyz[1],((ci+1)%5));
-    new_point =offset_by_one_context(dist,new_point);
-    fprintf(stderr,"	%f,%f\n",new_point.xyz[0],new_point.xyz[1]);    
-    }
-  }
-else {
-  for (int ci = to_context;ci!=from_context; ci = ((ci+6)%5)) {
-    fprintf(stderr,"back converting %d  %f,%f	-> %d\n",ci,new_point.xyz[0],new_point.xyz[1],((ci+6)%5));
-    new_point =offset_by_one_context(dist,new_point);
-    fprintf(stderr,"	%f,%f\n",new_point.xyz[0],new_point.xyz[1]);    
-    }
-  }
-return(new_point);
-}
-
-
-
-super_point *xyz_from_context_to_all_contexts
-  (int from_context,float dist,super_point new_point,super_point points_by_context[5]) {
-super_point old_point=new_point;
-int ci = from_context;
-points_by_context[ci] = new_point;
-for (int i = 0;i<2;i++) {
-  fprintf(stderr,"converting %d  %f,%f	-> %d\n",ci,new_point.xyz[0],new_point.xyz[1],((ci+1)%5));
-  new_point =offset_by_one_context(dist,new_point);
-  fprintf(stderr,"	%f,%f\n",new_point.xyz[0],new_point.xyz[1]);
-  ci = ((ci+1)%5);
-  points_by_context[ci] = new_point;  
-  }
-ci = from_context;
-
-new_point = old_point;
-for (int i = 0;i<2;i++) {
-  fprintf(stderr,"back-converting %d  %f,%f	-> %d\n",ci,new_point.xyz[0],new_point.xyz[1],((ci+6)%5));
-  new_point =back_offset_by_one_context(dist,new_point);
-  fprintf(stderr,"	%f,%f\n",new_point.xyz[0],new_point.xyz[1]);
-  ci = ((ci+6)%5);
-  points_by_context[ci] = new_point;  
-  }
-  
-return(points_by_context);
-}
-
 
     
     
