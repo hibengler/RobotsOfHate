@@ -123,241 +123,159 @@ for (newi=0;newi<count;newi++) {
 
 
 
-super_point expanded_superpos_to_xyz_context(expanded_superpos *epx,int context) {
-int *ms;
-ms = superpos_map_to(context);
-int m0=ms[0];
-int m1=ms[1];
-int m2=ms[2];
-int m3=ms[3];
-int m4=ms[4];
 
-    /* think of it as             3
-                          4     1
-                             0
-			  3     2
-			          4 
-	so that we can keep 0,2, 2-> 0 normatl
-				  
-				  */
-
-        
-    double xoff0 = epx->d[m0][m1] - epx->d[m0][m3] 
-                 - epx->d[m0][m4] + epx->d[m0][m2];
-    double xoff2 =  ((epx->d[m1][m3]  + epx->d[m2][m4]) - ( epx->d[m4][m2] +epx->d[m3][m1]))  * 0.5;
-
-    
-    double yoff2 = (epx->d[m1][m3] - epx->d[m2][m4] + epx->d[m4][m2] - epx->d[m3][m1]) * 0.5;
-    double yoff0 = epx->d[m0][m4] - epx->d[m0][m2]  + epx->d[m0][m1] - epx->d[m0][m3];
-    double zoff0 = epx->d[m0][m0];
-    
-    fprintf(stderr,"---->got 1,2,3,4 %f,%f,%f,%f\n", epx->d[m0][m1], epx->d[m0][m2], epx->d[m0][m3], epx->d[m0][m4]);
-    fprintf(stderr," 	actually is model %d: %d,%d,%d,%d\n",m0,m1,m2,m3,m4);
-    
-    fprintf(stderr,"4-2 %f and 1-3 %f\n", epx->d[m0][m4] - epx->d[m0][m2], epx->d[m0][m1] - epx->d[m0][m3] );
-    fprintf(stderr,"xoff %f yoff %f\n", xoff0,yoff0);
-    fprintf(stderr,"Plus (%f+%f -%f-%f)/2,  (%f+%f -%f-%f)/2 ->(%f-%f)/2,(%f-%f/2) -> %f,%f is %f,%f\n\n",
-        epx->d[m1][m3],epx->d[m2][m4],
-	epx->d[m4][m2],epx->d[m3][m1], // xoff2
-        epx->d[m4][m2],epx->d[m1][m3],
-	epx->d[m2][m4],epx->d[m3][m1], // yoff2
-	(epx->d[m2][m4]+epx->d[m1][m3]),-(epx->d[m4][m2],epx->d[m3][m1]), // xx adding 
-        (epx->d[m4][m2]+epx->d[m1][m3]),-(epx->d[m2][m4]+ epx->d[m3][m1]) ,xoff2,yoff2,xoff0+xoff2,yoff0+yoff2);
-    
-    return (super_point){xyz:{xoff0+xoff2,yoff0+yoff2,epx->d[m0][m0]}};
-}
-
-
-
-
-
-
-
-
- 
-super_point xyz_from_context_to_context(int from_context,float dist,super_point new_point,int to_context) {
-expanded_superpos en;
-
-set_from_xyz_in_context(from_context,&en, new_point,dist);
- 
-
-return(expanded_superpos_to_xyz_context(&en,to_context));
-}
-
-
-
-
-
-
-
-
-
-
-
-int set_from_xyz_in_context(int context,expanded_superpos *ep,super_point p, float dist) {
-int i;
-int j;
-int *ms;
-ms = superpos_map_to(context);
-int m0=ms[0];
-int m1=ms[1];
-int m2=ms[2];
-int m3=ms[3];
-int m4=ms[4];
-
-/* so the m allows us to map to any one of the possible contexts - 0 thru 4 - properly */
-double hdist = dist * 0.5; /* if dist is 2 (-1 to 1) then hdist is 1 */
-double hdist2 = dist * 0.5; /* if dist is 2 (-1 to 1) then hdist is 1 */
-double qdist = hdist * 0.5; /* if dist is 2 (-1 to 1) then qdist is 0,5 */
-
-float x=p.xyz[0];
-float y=p.xyz[1];
-float z=p.xyz[2];
-
-    for (int i=0;i<5;i++) {
-      for (int j=0;j<5;j++) {
-        ep->d[i][j] = qdist;
-	}
-      }
-    ep->d[m0][m0] = z;        
-    ep->d[m1][m1] = z;        
-    ep->d[m2][m2] = z;        
-    ep->d[m3][m3] = z;        
-    ep->d[m4][m4] = z;        
-    
-    ep->d[m0][m1] = 0.;
-    ep->d[m0][m2] = 0.;
-    ep->d[m0][m3] = 0.;
-    ep->d[m0][m4] = 0.;
-    ep->d[m4][m0] = hdist;
-    ep->d[m3][m0] = hdist;
-    ep->d[m2][m0] = hdist;
-    ep->d[m1][m0] = hdist;
-    
-    /* above _ the qdist puts us in dead center */
-    
-    
-if ((x!=0.)||(y!=0.)) { // if we are nothing
- if (fabs(y) >= fabs(x)) { //if y is bigger than x
-  if (y>=0) { // if y is >0
-    if (x>=0) {
-      ep->d[m0][m1] = x;
-      ep->d[m1][m0] = hdist-x;
-      
-      double halfdiff = (y-x) * 0.5;
-      if (halfdiff<0.) {fprintf(stderr," bad halfdiff 0:%lf\n",halfdiff);exit(-1);}
-      ep->d[m1][m3] = halfdiff;  // x up, y up
-      ep->d[m4][m2] = halfdiff;  // down, y up
-      }
-    else {
-      ep->d[m0][m4] = -x;
-      ep->d[m4][m0] = hdist - ep->d[m0][m4];
-      
-      double halfdiff = (y+x) * 0.5;
-      if (halfdiff<0.) {fprintf(stderr," bad halfdiff 1:%lf\n",halfdiff);exit(-1);}
-      ep->d[m1][m3] = qdist+halfdiff; // x up y down  
-      ep->d[m4][m2] = qdist+halfdiff; // y up, x down
-      }	
+super_point offset_by_one_context(float dist,super_point before) {
+float hdist = dist*0.5;
+double p2to_1 = before.xyz[1];
+double p4to_1 = before.xyz[0];
+fprintf(stderr,"x,y is %f,%f:	",p4to_1,p2to_1);
+super_point base;
+if (p2to_1>=0) {
+  if (p4to_1>=0) {
+    base = (super_point){xyz:{-hdist,hdist,before.xyz[3]}};
+    fprintf(stderr,"0 base  %f,%f	",base.xyz[0],base.xyz[1]);
+    base.xyz[1] -= p2to_1;
+    base.xyz[0] += p4to_1;
     }
   else {
-    if (x>=0) {
-      ep->d[m0][m2] = x;
-      ep->d[m2][m0] = hdist-x;
-      
-      double halfdiff = ((-y)-x) * 0.5;
-      if (halfdiff<0.) {fprintf(stderr," bad halfdiff 2:%lf\n",halfdiff);exit(-1);}
-      ep->d[m3][m1] = qdist+halfdiff; // y down x down
-      ep->d[m2][m4] = qdist+halfdiff; // y down x up
-      }
-    else {
-      ep->d[m0][m3] = -x;
-      ep->d[m3][m0] = hdist+x;
-      
-      double halfdiff=  ((-y)+x)*0.5;
-      if (halfdiff<0.) {fprintf(stderr," bad halfdiff 3:%lf\n",halfdiff);exit(-1);}
-      ep->d[m3][m1] = qdist+halfdiff;  // y down, x down
-      ep->d[m2][m4] = qdist+halfdiff;  // y down, x up
-      }     
-    } 
-  } /* if y is biffer than x */
-else { /* x is bigger than y */
-  if (y>=0) { // if y is >0
-    if (x>=0) {
-      ep->d[m0][m1] = y;
-      ep->d[m1][m0] = hdist-y;
-      
-      double halfdiff=  (x-y)*0.5;
-      if (halfdiff<0.) {fprintf(stderr," bad halfdiff 4:%lf\n",halfdiff);exit(-1);}
-      
-      ep->d[m1][m3] = qdist+halfdiff; // x up, y down
-      ep->d[m2][m4] = qdist+halfdiff; // x up y up
-      }
-    else {
-      ep->d[m0][m4] = y;
-      ep->d[m4][m0] = hdist - ep->d[m0][m4];
-      
-      double halfdiff=  (-x -y)*0.5;
-      if (halfdiff<0.) {fprintf(stderr," bad halfdiff 5:%lf\n",halfdiff);exit(-1);}
-      ep->d[m3][m1] = qdist+halfdiff; // x down, y down
-      ep->d[m4][m2] = qdist+halfdiff; // x down, y up
-      }	
+    base = (super_point){xyz:{0.,dist,before.xyz[3]}};
+    fprintf(stderr,"1 base  %f,%f	",base.xyz[0],base.xyz[1]);
+    base.xyz[1] += p4to_1;
+    base.xyz[1] += p4to_1;
+    base.xyz[1] -= p2to_1;
+    base.xyz[0] -= p2to_1;
+    base.xyz[0] -= (p2to_1+p4to_1);
+    
     }
-  else { // y is negative
-    if (x>=0) {
-      ep->d[m0][m2] = -y;
-      ep->d[m2][m0] = hdist - ep->d[m0][m2];
-      
-      double halfdiff=  (x +y)*0.5;
-       if (halfdiff<0.) {fprintf(stderr," bad halfdiff 6:%lf\n",halfdiff);exit(-1);}
-      ep->d[m1][m3] = qdist+halfdiff;  // x up, y up
-      ep->d[m2][m4] = qdist+halfdiff;  // x down y down
-      
-      }
-    else {
-      ep->d[m0][m3] = -y;
-      ep->d[m3][m0] = hdist+y;
-      
-      double halfdiff=  (+y + (-x))*0.5;
-      if (halfdiff<0.){fprintf(stderr," bad halfdiff 7:%lf\n",halfdiff);exit(-1);}
-      ep->d[m3][m1] = qdist+halfdiff;  // x down, y down
-      ep->d[m4][m2] = qdist+halfdiff;  //x down, y up
-
-      }      
-    } // if y is negative
-  } /* if y is biffer than x */
- } /* if we are not zero */
-else {
-  fprintf(stderr,"zero\n");
   }
-if (ep->d[m3][m1] != qdist) {
-  ep->d[m1][m3] = hdist- ep->d[m3][m1];
-  }
-else if (ep->d[m1][m3] != qdist) {
-  ep->d[m3][m1] = hdist- ep->d[m1][m3];
-  }
-if (ep->d[m2][m4] != qdist) {
-  ep->d[m4][m2] = hdist-ep->d[m2][m4];
-  }
-else if (ep->d[m4][m2] != qdist) {
-  ep->d[m2][m4] = hdist-ep->d[m4][m2];
+else { /* y iss < 0 */
+  if (p4to_1>0) {
+    base = (super_point){xyz:{0.,hdist,before.xyz[3]}};
+    fprintf(stderr,"2 base  %f,%f	",base.xyz[0],base.xyz[1]);
+//    base.xyz[1] -= p4to_1;
+//    base.xyz[0] += p4to_1;
+    }
+  else {
+    base = (super_point){xyz:{0.,-hdist,before.xyz[3]}};
+    fprintf(stderr,"3 base  %f,%f	",base.xyz[0],base.xyz[1]);
+    base.xyz[0] -= p2to_1;
+//    base.xyz[1] -= p4to_1;
+    }
   }
   
+fprintf(stderr,"	final to %f,%f	",base.xyz[0], base.xyz[1]);
+fprintf(stderr,"		Note: original x %f,%f\n",p2to_1,p4to_1);
 
-
-
-          
-fprintf(stderr,"\n\n\nvvvvvvvvvvvvvvvvvvvvv\ncontext %d x %f y %f\n",context,p.xyz[0],p.xyz[1]);
-for (int i=0;i<5;i++) {
-  for (int j=0;j<5;j++) {
-    if ((i!= j) &&(ep->d[i][j])!= qdist) {
-      fprintf(stderr,"%d -> %d = %f	",i,j,ep->d[i][j]);
-      }
-    }  
-  }
-fprintf(stderr,"\n\n");    
-        
-return 0;    
+return(base);
 }
+
+
+
+  
+    
+
+
+
+
+super_point back_offset_by_one_context(float dist,super_point after) {
+float hdist = dist*0.5; // an idea to go backward 
+double p2to_1 = after.xyz[1];
+double p4to_1 = after.xyz[0];
+fprintf(stderr,"x,y is %f,%f:	",p4to_1,p2to_1);
+super_point base;
+if (p2to_1>=0) {
+  if (p4to_1>=0) {
+    base = (super_point){xyz:{hdist,hdist,after.xyz[3]}};
+    fprintf(stderr,"0 base  %f,%f	",base.xyz[0],base.xyz[1]);
+    base.xyz[1] += p2to_1;
+    base.xyz[1] += p4to_1;
+    base.xyz[0] += p4to_1;
+    
+    }
+  else {
+    base = (super_point){xyz:{0.,dist,after.xyz[3]}};
+    fprintf(stderr,"1 base  %f,%f	",base.xyz[0],base.xyz[1]);
+    base.xyz[1] += p4to_1;
+    base.xyz[1] += p4to_1;
+    base.xyz[1] -= p2to_1;
+    base.xyz[0] -= p2to_1;
+    base.xyz[0] -= (p2to_1+p4to_1);
+    
+    }
+  }
+else { /* y iss < 0 */
+  if (p4to_1>0) {
+    base = (super_point){xyz:{0.,hdist,after.xyz[3]}};
+    fprintf(stderr,"2 base  %f,%f	",base.xyz[0],base.xyz[1]);
+//    base.xyz[1] -= p4to_1;
+//    base.xyz[0] += p4to_1;
+    }
+  else {
+    base = (super_point){xyz:{0.,-hdist,after.xyz[3]}};
+    fprintf(stderr,"3 base  %f,%f	",base.xyz[0],base.xyz[1]);
+    base.xyz[0] -= p2to_1;
+//    base.xyz[1] -= p4to_1;
+    }
+  }
+  
+fprintf(stderr,"	final to %f,%f	",base.xyz[0], base.xyz[1]);
+fprintf(stderr,"		Note: original x %f,%f\n",p2to_1,p4to_1);
+
+return(base);
+}
+
+
+        
+    
+      
+	  
+super_point xyz_from_context_to_context(int from_context,float dist,super_point new_point,int to_context) {
+if ( (((from_context+1)%5)==to_context)||(((from_context+2)%5) == to_context)) {
+  for (int ci = from_context;ci!=to_context; ci = ((ci+1)%5)) {
+    fprintf(stderr,"converting %d  %f,%f	-> %d\n",ci,new_point.xyz[0],new_point.xyz[1],((ci+1)%5));
+    new_point =offset_by_one_context(dist,new_point);
+    fprintf(stderr,"	%f,%f\n",new_point.xyz[0],new_point.xyz[1]);    
+    }
+  }
+else {
+  for (int ci = to_context;ci!=from_context; ci = ((ci+6)%5)) {
+    fprintf(stderr,"back converting %d  %f,%f	-> %d\n",ci,new_point.xyz[0],new_point.xyz[1],((ci+6)%5));
+    new_point =offset_by_one_context(dist,new_point);
+    fprintf(stderr,"	%f,%f\n",new_point.xyz[0],new_point.xyz[1]);    
+    }
+  }
+return(new_point);
+}
+
+
+
+super_point *xyz_from_context_to_all_contexts
+  (int from_context,float dist,super_point new_point,super_point points_by_context[5]) {
+super_point old_point=new_point;
+int ci = from_context;
+points_by_context[ci] = new_point;
+for (int i = 0;i<2;i++) {
+  fprintf(stderr,"converting %d  %f,%f	-> %d\n",ci,new_point.xyz[0],new_point.xyz[1],((ci+1)%5));
+  new_point =offset_by_one_context(dist,new_point);
+  fprintf(stderr,"	%f,%f\n",new_point.xyz[0],new_point.xyz[1]);
+  ci = ((ci+1)%5);
+  points_by_context[ci] = new_point;  
+  }
+ci = from_context;
+
+new_point = old_point;
+for (int i = 0;i<2;i++) {
+  fprintf(stderr,"back-converting %d  %f,%f	-> %d\n",ci,new_point.xyz[0],new_point.xyz[1],((ci+6)%5));
+  new_point =back_offset_by_one_context(dist,new_point);
+  fprintf(stderr,"	%f,%f\n",new_point.xyz[0],new_point.xyz[1]);
+  ci = ((ci+6)%5);
+  points_by_context[ci] = new_point;  
+  }
+  
+return(points_by_context);
+}
+
+
     
     
 

@@ -26,7 +26,7 @@ for (int i=0;i<HATE_NUMBER_ROBOTS;) {
 
 
 void game_init(hate_game *game,int my_player_id) {
-game->dist = 0.6666666666666666666;
+game->dist = 0.6666666666666666666666666666;
 float dist=game->dist;
 float qdist = dist *0.25f;
 float one_over_qdist = 1.0f/qdist;
@@ -95,7 +95,7 @@ for (int i=0;i<HATE_NUMBER_PLAYERS;i++) {
   player->player_id=i;
   for (int j=0;j<HATE_NUMBER_ROBOTS;j++) {
     hate_robot *robot = &(player->robots[j]);
-    robot->current_point=(super_point){xyz:{0.15f*j,0.10f*j,0.1f}};
+    robot->current_point=(super_point){xyz:{0.15f*j,0.07f*j,0.1f}};
     robot->last_point=(super_point){xyz:{0.f,0.f,0.f}};
     robot->size=0.20;
     robot->sizetimessize=robot->size*robot->size;
