@@ -134,7 +134,7 @@ float z=start.xyz[2];
 float hdist = dist*0.5;
 super_point base = (super_point){xyz:{x,y,z}};
 int number_contexts = (to_context+5-from_context) % 5;
-fprintf(stderr,"number contexts = %d pt = %f,%f\n",number_contexts,x,y);
+fprintf(stderr,"D %f number contexts = %d pt = %f,%f\n",dist,number_contexts,x,y);
 if (number_contexts ==0) {
   }
 else if (number_contexts == 1) {

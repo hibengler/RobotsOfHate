@@ -22,6 +22,10 @@ for (int i=0;i<HATE_NUMBER_ROBOTS;) {
     robot_choices[i++] = pick;
     }
   }
+//for (int i=0;i<HATE_NUMBER_ROBOTS;i++) {
+//  robot_choices[i]=i;
+//  }
+  //??? make it easeirr for now
 }
 
 
@@ -47,10 +51,10 @@ for (int i=0;i<HATE_NUMBER_PLAYERS;i++) {
   screen->player_id=i;
   pick_leagues(&(screen->robot_choices[0]));
   screen->robot_choices[0] = 0;
-  screen->robot_choices[0] = 1;
-  screen->robot_choices[0] = 2;
-  screen->robot_choices[0] = 3;
-  screen->robot_choices[0] = 4;
+  screen->robot_choices[1] = 1;
+  screen->robot_choices[2] = 2;
+  screen->robot_choices[3] = 3;
+  screen->robot_choices[4] = 4;
   
   
   if (i==0) {
@@ -95,7 +99,14 @@ for (int i=0;i<HATE_NUMBER_PLAYERS;i++) {
   player->player_id=i;
   for (int j=0;j<HATE_NUMBER_ROBOTS;j++) {
     hate_robot *robot = &(player->robots[j]);
-    robot->current_point=(super_point){xyz:{0.15f*j,0.07f*j,0.1f}};
+    robot->current_point=(super_point){xyz:{0.10f*j,0.07f*j,0.1f}};
+    fprintf(stderr,"from %d to %d x,y %f,%f -> ",player->player_id,game->my_player_id,robot->current_point.xyz[0],
+      robot->current_point.xyz[1]);
+    robot->current_point = xyz_from_context_to_context(player->player_id,
+        2.f,robot->current_point,game->my_player_id);
+    fprintf(stderr,"%f,%f\n",robot->current_point.xyz[0],
+      robot->current_point.xyz[1]);
+
     robot->last_point=(super_point){xyz:{0.f,0.f,0.f}};
     robot->size=0.20;
     robot->sizetimessize=robot->size*robot->size;
@@ -128,19 +139,20 @@ for (int s=0;s<HATE_NUMBER_PLAYERS;s++) {
     hate_screen *screen = &(game->screens.screens[s]);
     onec->viewMatrix = screen->screenViewMatrix;
     
-    multMatrix(&onec->MVPMatrix,&onec->viewMatrix,&onec->projectionMatrix);
-//    glUniformMatrix4fv(onec->mMVPMatrixHandle, 1, GL_FALSE, (GLfloat *)(&onec->MVPMatrix));
+//    multMatrix(&onec->MVPMatrix,&onec->viewMatrix,&onec->projectionMatrix);
+    glUniformMatrix4fv(onec->mMVPMatrixHandle, 1, GL_FALSE, (GLfloat *)(&onec->MVPMatrix));
     glUniformMatrix4fv(onec->mMVPMatrixHandle, 1, GL_FALSE, (GLfloat *)(&onec->viewMatrix));
     checkGlError("setmatrix");
 	   
-    for (int i=0;i<1;i++) { // for each player
+    for (int i=0;i<5;i++) { // for each player
       hate_player *player=&(game->players[i]);   
       for (int j=0;j<HATE_NUMBER_ROBOTS;j++) { // for each robot
         hate_robot *robot = &(player->robots[j]); 
 	super_point np;
- 	np = xyz_from_context_to_context(game->my_player_id,2.f,robot->current_point,s);
+ 	np = xyz_from_context_to_context(game->my_player_id,2.f,robot->current_point,i);
+ 	np = xyz_from_context_to_context(i,2.f,np,s);
         draw_larry_harvey_robot_3d(
-	      &(game->larry_harvey_robot_league->teams[screen->robot_choices[i]].players[j]),
+	      &(game->larry_harvey_robot_league->teams[i/*screen->robot_choices[i]*/].players[j]),
 	      (not_rl_Vector3){np.xyz[0],np.xyz[1],np.xyz[2]},
 	      (not_rl_Vector3){robot->size,robot->size,robot->size}
 	      );
