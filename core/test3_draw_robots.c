@@ -536,7 +536,7 @@ int main(void) {
 	game_draw(onec,&the_hate_game);
 	
         glfwSwapBuffers(window);
-	sleep(20000);
+
     }
     glDeleteBuffers(1, &vbo);
     glfwTerminate();

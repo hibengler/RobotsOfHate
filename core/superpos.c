@@ -131,135 +131,203 @@ super_point xyz_from_context_to_context (int from_context,float dist, super_poin
 float x=start.xyz[0];
 float y=start.xyz[1];
 float z=start.xyz[2];
+/* test without checks 
+while (x > dist) x -=dist;
+while (x < -dist) x +=dist;
+while (y > dist) y -=dist;
+while (y < -dist) y +=dist;
+*/
+float d[5][5];
 float hdist = dist*0.5;
 float qdist = hdist*0.5;
-float cy21 = y+qdist;
-float cy41 = x+qdist;
-while (cy21 > dist) cy21 -=dist;
-while (cy21 < -hdist) cy21 +=dist;
-while (cy41 > dist) cy41 -=dist;
-while (cy41 < -hdist) cy41 +=dist;
-if (cy21 > hdist) {
-  if (cx41>hdist) { 
+float absx=fabs(x);
+float absy=fabs(y);
+for (int i=0;i<5;i++) {
+  d[i][i] = z;
+  for (int j=0;j<5;j++) {
+    if (i!= j) {
+      d[i][j] = qdist;
+      }
     }
-  else if (cx41 < 0.f) {
+  d[0][i] = 0.f;
+  d[i][0] = hdist;
+  }
+// set to half way everywhere.
+float delta,initial;  
+float qdistxx=0.f;
+if (absy>absx) {
+  if (y>=0.f) { // Y>=0
+    if (x>=0.f) {  // Y>=0,x>=0
+      delta = (absy-absx)*0.5;
+      initial = absx+ delta;
+      
+      d[0][1] = qdistxx + initial;
+      d[1][0] = hdist-d[0][1];
+//  d[3][1] = qdistxx + initial;
+//  d[1][3] = hdist-d[3][1];
+	
+      d[0][4] = qdistxx+delta;
+      d[4][0] = hdist-d[0][4];
+//   d[2][4] = qdistxx+delta;
+//   d[4][2] = hdist-d[2][4];
+      }
+    else { // Y>=0, x<0 
+      delta = (absy-absx)*0.5;
+      initial = absx+ delta;
+      
+      d[0][4] = qdistxx + initial;
+      d[4][0] = hdist-d[0][4];
+//   d[2][4] = qdistxx + initial;
+//   d[4][2] = hdist-d[2][4];
+	
+      d[0][1] = qdistxx+delta;
+      d[1][0] = hdist-d[0][1];
+//   d[3][1] = qdistxx+delta;
+//   d[1][3] = hdist-d[3][1];
+      }  
     }
-  else {
+  else { // Y<0 
+    if (x>=0.f) { // -Y,x
+      delta = (absy-absx)*0.5;
+      initial = absx+ delta;
+      d[0][2] = qdistxx + initial;
+      d[2][0] = hdist-d[0][2];
+//   d[4][2] = qdistxx + initial;
+//   d[2][4] = hdist - d[4][2];
+      
+      d[0][3] = qdistxx+delta;
+      d[3][0] = hdist - d[0][3];
+//   d[1][3] =  qdistxx+delta;
+//   d[3][1] = hdist - d[1][3];
+      }
+    else {  //-x, -Y
+      delta = (absy-absx)*0.5;
+      initial = absx+ delta;
+      d[0][3] = qdistxx + initial;
+      d[3][0] = hdist-d[0][3];
+//   d[1][3] = qdistxx + initial;
+//   d[3][1] = hdist - d[1][3];
+      
+      d[0][2] = qdistxx+delta;
+      d[2][0] = hdist - d[0][2];
+//   d[4][2] =  qdistxx+delta;
+//   d[2][4] = hdist - d[4][2];
+      }
+    } // Y<0
+  } // Y>x
+else { // X>y
+  if (y>=0.f) { // y>=0
+    if (x>=0.f) {  // y>=0,X>=0
+ fprintf(stderr," y>=0,X>=0   k\n");
+      delta = (absx-absy)*0.5;
+      initial = absy+ delta;
+   fprintf(stderr,"initial %f delta %f\n",initial,delta);
+      d[0][1] = qdistxx + initial;
+      d[1][0] = hdist-d[0][1];
+//     d[1][3] = qdist + initial;
+//   d[3][1] = hdist-d[1][3];
+	
+      d[0][2] = qdistxx+delta;
+      d[2][0] = hdist-d[0][2];
+//   d[4][2] = qdist+delta;
+//   d[2][4] = hdist-d[4][2];
+      fprintf(stderr,"0,1 %f, 0,2 %f\n",d[0][1],d[0][2]);
+      }
+    else { // y>=0, X<=0
+      delta = (absx-absy)*0.5;
+      initial = absy+ delta;
+      
+      d[0][4] = qdistxx + initial;
+      d[4][0] = hdist-d[0][4];
+      d[2][4] = qdistxx + initial;
+      d[4][2] = hdist-d[2][4];
+	
+      d[0][3] = qdistxx+delta;
+      d[3][0] = hdist-d[0][3];
+//   d[1][3] = qdistxx+delta;
+//   d[3][1] = hdist-d[1][3];
+      }
+    } // y>=0
+  else { //y<=0
+    if (x>=0.) {  // y<0. X>=0
+    fprintf(stderr," y<0. X>=0\n");
+      delta = (absx-absy)*0.5;
+      initial = absy+ delta;
+      
+      d[0][2] = qdistxx + initial;
+      d[2][0] = hdist-d[0][2];
+//   d[4][2] = qdistxx + initial;
+//   d[2][4] = hdist-d[4][2];
+	
+      d[0][1] = qdistxx+delta;
+      d[1][0] = hdist-d[0][1];
+//   d[3][1] = qdistxx+delta;
+//   d[1][3] = hdist-d[3][1];
+      }
+    else { // y<0, X<0    	
+    fprintf(stderr," y<0. X<0\n");
+      delta = (absx-absy)*0.5;
+      initial = absy+ delta;
+      
+      d[0][3] = qdistxx + initial;
+      d[3][0] = hdist-d[0][3];
+//   d[1][3] = qdistxx + initial;
+//   d[3][1] = hdist-d[1][3];
+	
+      d[0][4] = qdistxx+delta;
+      d[4][0] = hdist-d[0][4];
+//   d[2][4] = qdistxx+delta;
+//   d[4][2] = hdist-d[2][4];
+      }
+    } // y<0	
+  } // X>y
+// quick check 
+for (int i=0;i<5;i++) {
+  for (int j=0;j<5;j++) {
+    if (i!=j) {
+      if (fabs(d[i][j]- ( hdist - d[j][i])) >0.001) {
+        fprintf(stderr,"error %f [%d][%d] is not hdist - %f[%d][%d] (%f)\n",d[i][j],i,j,d[j][i],j,i,hdist-d[j][i]);
+	}
+      }
     }
   }
-else if (cy21<0.f) {
-  if (cx41>hdist) { 
-    }
-  else if (cx41 < 0.f) {
-    }
-  else {
-    }
-}
-else if (cx21>hdist) { 
-}
-else if (cx21<-0.f) {
-}
-
-
-4 -> 1 = 3 -> 2
-2 -> 1 = 4-> 3
-0 -> 2 = 4-> 3
-0 -> 4 = 3 ->2 = 4->1 = 1->3
-0-> 1 = 0->2 = 4->3
-0->4 = 2->1 == 4->3 = 
-
-
-OK, need to add to 0,1 and subtract from 1,3
-and versa voze for 0,4 
-
-
-
-{ // normally else - where we are betweeen 0 and hdist 
-if (cy21 > cx41) { // if more y than x quadrant 4012
-  if (cx41 >= qdiff) {  // in quadrant 012, y21 is bigger
-    d[1][0] = sqrt(((hdist-cx41)*(hdist-cx41)*2.)*one_over_sqrt2; // cx41 is now in 01, 10 is inverse
-    d[0][1] = hdiff-[1][0];
-    cy21 = cy21 - (cx41-qdiff); // make y smaller
-    cx41 = qdiff; // adjust candidate cx41 to 0
-    
-    /* now for experimet - figure out screen 1 - 0    2
-                                                    1
-						 4    3 */
-    nx = -d[1][0] /* hdist-oldcx41 */ + qdist /* 1->3 placeholder  */ + (hdist-cy21) + cx41 /*wdost (/
-    // -hdist + oldcx41 +qdist + hdist -cy21 -qdist
-    //           oldcx41         - (oldcy21 - (oldcx41-qdiff))
-    //          oldcx41            - oldcy21 - oldcx41 + qdiff
-    //             -oldcy21
-    ny = d[1][0]  /* hdist-oldcx41 */ - qdist  /* 1->3 placeholder  */ +  (hdist-cy21) - cx41 /* qdist */
-    // = hdist- oldcx1 - qdist                                         + hdist -cy21 - qdist
-    //   hdist    - oldcx41                                            - cy21
-    //   hdist   -oldxc41                                             - (oldcy21 - (oldcx41 - qdiff )
-    // =      hdist             -oldcx41                              - (oldcy21 - oldcx41 + qdiff )
-    // =      hdist       - oldcx41                                  - oldcy21  - oldcx41 + qdiff
-    nxforscreen2 = -cy21 + qdist /* 1,3 */ - q[2][0] /* qdist */+ d[2][3]  which is qdist, or is it hdist - 41 - whell that is qdist now anyways*/
-    = -(oldcy21 - (oldcx41-qdiff))  + qdist - qdist + qdist
-    = -oldcy21 + (oldcx41 - qdiff) +                + qdist
-    = -oldcy21 + (oldcx41) - qdiff
-    nyforscreen2 = cy21 - qdist - qdist + qdist  
-    = cy21 - qdist 
-    huh might be right
-    nxforscreen3 = -qdist + qdist -qdist + (hdist-cy21 )
-    //                            qdist - cy21
-    nyforscreen3 = cy21 - qdist + qdist - qdist = cy21 - qdist
-    bxforscreen4 =- ( hdist - cy21) +  qdist 
-                 = cy21 -qdist 
 
 super_point base = (super_point){xyz:{x,y,z}};
 int number_contexts = (to_context+5-from_context) % 5;
 //fprintf(stderr,"D %f number contexts = %d pt = %f,%f\n",dist,number_contexts,x,y);
 if (number_contexts ==0) {
+  float x1 = -d[0][4] + d[0][2] -d[0][3] + d[0][1];
+  float y1 = d[0][1] + d[0][4] - d[0][3] - d[0][2];
+  if ((fabs(x1-x) >0.001)||(fabs(y1 -y)>0.001)) {
+    fprintf(stderr,"identify error original %f,%f fixed %f,%f\n",x,y,x1,y1);
+    fprintf(stderr,"1,2,3,4: %f,%f,%f,%f\n",d[0][1],d[0][2],d[0][3],d[0][4]);
+    fprintf(stderr,"1+4 is %f - 2-3 is %f\n",  d[0][1] + d[0][4], - d[0][3] - d[0][2]);
+    }
   }
 else if (number_contexts == 1) {
-  base = (super_point){xyz:{-hdist,hdist,z}};
-  base.xyz[0] += x;
-  base.xyz[1] -= y;
+  base = (super_point){xyz:{d[0][2]   - d[1][0]-d[0][3], 
+                            d[1][0]-d[0][4] +d[0][3],z}};
+//  base = (super_point){xyz:{d[1][2]+d[1][3] - d[1][0] - d[1][4], 
+//                            d[1][0]+d[1][2] - d[1][4] - d[1][3],z}};
   }
 else if (number_contexts == 2) {
-  base = (super_point){xyz:{-hdist,-hdist,z}};
-  base.xyz[0] += y;
-  base.xyz[1] += x;
+  base = (super_point){xyz:{ -hdist + d[0][4]+d[0][2],
+                             -hdist + d[0][2] + d[0][1],z}};
+//  base = (super_point){xyz:{d[2][3] + d[2][4] - d[2][1] - d[2][0],
+//                            d[2][3] + d[2][1] - d[2][0] - d[2][4],z}};
   }
 else if (number_contexts == 3) {
-  base = (super_point){xyz:{hdist,-hdist,z}};
-  base.xyz[0] -= x;
-  base.xyz[1] += y;
+  base = (super_point){xyz:{d[3][4] + d[3][0] - d[3][2] - d[3][1],
+                            d[3][2] + d[3][4] - d[3][0] - d[3][1],z}};
   }
 else if (number_contexts == 4) {
-  base = (super_point){xyz:{hdist,hdist,z}};
-  base.xyz[0] -=y;
-  base.xyz[1] -=x;
+  base = (super_point){xyz:{d[4][0] + d[4][1] - d[4][3] - d[4][2],
+                            d[4][3] + d[4][0] - d[4][2] - d[4][1],z}};
   }
-//fprintf(stderr, "from %d to %d 	is %f,%f\n",from_context,to_context,base.xyz[0],base.xyz[1]);
+fprintf(stderr, "from %d to %d 	is %f,%f\n",from_context,to_context,base.xyz[0],base.xyz[1]);
 return(base);
 }
 
-/*
-    x    1
-    . \   y
-0    
-
-        2
-
-4     1
-   0  
-3     2
-
-p41 - q + p01 = x
-p21 - q + p01 = y
-p02 - q - p21 - 
-    
-neural network
-
-x,y  (0,5) ->    25 a < b x,y sio 25 -> 200 then 200 -> 25 then 25 -> 200 then 200 -> 5
-or
-
-distance from 0 
-angle from 
 
  
 

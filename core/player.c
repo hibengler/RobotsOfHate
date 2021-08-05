@@ -99,7 +99,7 @@ for (int i=0;i<HATE_NUMBER_PLAYERS;i++) {
   player->player_id=i;
   for (int j=0;j<HATE_NUMBER_ROBOTS;j++) {
     hate_robot *robot = &(player->robots[j]);
-    robot->current_point=(super_point){xyz:{0.10f*j,0.07f*j,0.1f}};
+    robot->current_point=(super_point){xyz:{0.10f*j,0.09f*j,0.15f}};
 //    fprintf(stderr,"from %d to %d x,y %f,%f -> ",player->player_id,game->my_player_id,robot->current_point.xyz[0],
 //      robot->current_point.xyz[1]);
     robot->current_point = xyz_from_context_to_context(player->player_id,
@@ -120,15 +120,23 @@ for (int i=0;i<HATE_NUMBER_PLAYERS;i++) {
 
 
 
-
+static float angle=0.f;
 void game_step(hate_game *game) {
 for (int i=0;i<HATE_NUMBER_PLAYERS;i++) {
   hate_player *player=&(game->players[i]);   
   for (int j=0;j<HATE_NUMBER_ROBOTS;j++) {
     hate_robot *robot = &(player->robots[j]);
+    
+    robot->last_point = robot->current_point;
+    float x= robot->current_point.xyz[0];
+    float y= robot->current_point.xyz[1];
+    robot->current_point.xyz[0] = x*cosf(angle) + y*sin(angle);
+    robot->current_point.xyz[1] = -x*sinf(angle) + y*cos(angle);
+    
     /* nop for now */
     }  
   }
+angle += 1./16500.;
 }
 
 
@@ -144,7 +152,7 @@ for (int s=0;s<HATE_NUMBER_PLAYERS;s++) {
     glUniformMatrix4fv(onec->mMVPMatrixHandle, 1, GL_FALSE, (GLfloat *)(&onec->viewMatrix));
     checkGlError("setmatrix");
 	   
-    for (int i=0;i<5;i++) { // for each player
+    for (int i=0;i<1;i++) { // for each player
       hate_player *player=&(game->players[i]);   
       for (int j=0;j<HATE_NUMBER_ROBOTS;j++) { // for each robot
         hate_robot *robot = &(player->robots[j]); 
