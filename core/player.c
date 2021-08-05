@@ -100,12 +100,12 @@ for (int i=0;i<HATE_NUMBER_PLAYERS;i++) {
   for (int j=0;j<HATE_NUMBER_ROBOTS;j++) {
     hate_robot *robot = &(player->robots[j]);
     robot->current_point=(super_point){xyz:{0.10f*j,0.07f*j,0.1f}};
-    fprintf(stderr,"from %d to %d x,y %f,%f -> ",player->player_id,game->my_player_id,robot->current_point.xyz[0],
-      robot->current_point.xyz[1]);
+//    fprintf(stderr,"from %d to %d x,y %f,%f -> ",player->player_id,game->my_player_id,robot->current_point.xyz[0],
+//      robot->current_point.xyz[1]);
     robot->current_point = xyz_from_context_to_context(player->player_id,
         2.f,robot->current_point,game->my_player_id);
-    fprintf(stderr,"%f,%f\n",robot->current_point.xyz[0],
-      robot->current_point.xyz[1]);
+//    fprintf(stderr,"%f,%f\n",robot->current_point.xyz[0],
+//      robot->current_point.xyz[1]);
 
     robot->last_point=(super_point){xyz:{0.f,0.f,0.f}};
     robot->size=0.20;
@@ -157,8 +157,8 @@ for (int s=0;s<HATE_NUMBER_PLAYERS;s++) {
 	      (not_rl_Vector3){robot->size,robot->size,robot->size}
 	      );
 	      
-	fprintf(stderr,"draw screen %d np %f,%f,%f size %f\n",
-	     s,np.xyz[0],np.xyz[1],np.xyz[2],(float)robot->size);
+//	fprintf(stderr,"draw screen %d np %f,%f,%f size %f\n",
+//	     s,np.xyz[0],np.xyz[1],np.xyz[2],(float)robot->size);
         } // for each robot that needs to be printed
       } // for each player
     }  // if we are to do this screen
