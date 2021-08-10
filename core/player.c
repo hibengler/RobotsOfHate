@@ -99,7 +99,7 @@ for (int i=0;i<HATE_NUMBER_PLAYERS;i++) {
   player->player_id=i;
   for (int j=0;j<HATE_NUMBER_ROBOTS;j++) {
     hate_robot *robot = &(player->robots[j]);
-    robot->current_point=(super_point){xyz:{0.10f*j,0.09f*j,0.15f}};
+    robot->current_point=(super_point){xyz:{0.16f*j,0.09f*j,0.15f}};
 //    fprintf(stderr,"from %d to %d x,y %f,%f -> ",player->player_id,game->my_player_id,robot->current_point.xyz[0],
 //      robot->current_point.xyz[1]);
     robot->current_point = xyz_from_context_to_context(player->player_id,

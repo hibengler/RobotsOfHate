@@ -1,0 +1,82 @@
+superpos - figuring out the position from x,y in one screen to another sucks.  I had it solved in an earlier try, but that version 
+seems to be lost.
+
+so for now,  I think attacks should be
+
+ID	type	from player	to player	robot	from beat  	R	P	S	
+11	A	1		4		3	1		....
+
+And just mov the pieces from pplanet to planet position in time 
+
+
+Then every response will have
+
+StartID  bitmapOK
+
+
+
+
+0 -> 1			0	01
+
+0 -> 4 1->2		01	0
+
+2 ->3, 4 -> 6
+					0	1	2	3	4	5
+   0-> 1 -> 2 -> 3 -> 4 -> 5 , 5 ->0	0	01	
+   0-> 2 2 -> 4, 3 -> 5, 4-> 0		0	01	02      
+   0 -> 4, 2 -> 0, 3 -> 1, 4 -> 2       02      012                     02
+   
+packet run 1 0->1, 0->2,		a0	b01	c02
+packet run 2 0->3, 0->4,		a012	b012	c012    C013   C0124	C0125
+             1->3, 1->5
+	     2->4, 2->5
+	     A1->0
+	     a1->2
+	     A1->4
+	     A2->0
+	     a2->1
+	     A2->5
+	    
+	     
+packet run 3 
+
+						a0	b01
+packet run 2 0->2, 1->3			a0	b01    b02	c013		
+packet run 3 0->4  1->5  2->4 3->5A 	d012 	b01    b02	c013	c014	c025						
+                   now 0 knows if ok or not in normal play
+		   
+Ack run    5->4, 4,5	 
+
+
+complex 1,2,3 then ack 1,2,3
+
+
+Simple - 0->1, 0->2, 0->3, 0->4, 0->5
+
+
+1->0 ack, 1->1 ack, 1->2 ack, 
+when 3 are done, no more bets time this beat, else next beat
+
+each one
+6 bits for 0,1,2,3,4,5 ack
+5 is only used if a player is out, and it is odd
+then if no more bets time next beat.
+rest of the 3 bits used for counters or something.
+
+
+broadcast 
+0-> 1 ->2
+
+Then 0-> 5 1->4, 2->3
+Then 
+
+
+Start packet number,F - Forward, R -> Reverse bytearray of acks, request_time
+Each packet has possible mode - 0 - send. 1 - Send along, 3 - help
+
+
+Ech packet start with pno, server time.
+
+
+
+Well, its really from one to another.
