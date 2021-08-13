@@ -1,4 +1,4 @@
- #ifndef NETWORK1_H 
+#ifndef NETWORK1_H 
 #define NETWORK1_H 1
 
 
@@ -19,7 +19,9 @@
 #include <signal.h>
 #include <unistd.h>
 #include <time.h>
-
+#include <netinet/in.h>
+#include <arpa/inet.h>
+		     
 
 #define NUMBER_OF_NETWORK1_PARTICIPANTS 6
 #define NUMBER_OF_NETWORK1_PARTICIPANTS_TIMES_2 12
@@ -42,11 +44,70 @@ typedef struct network1_complete {
   int current_number_of_polls;
 
   char ip_addresses_string[NUMBER_OF_NETWORK1_PARTICIPANTS][20];
-  struct sockaddr_in sending_to[NUMBER_OF_NETWORK1_PARTICIPANTS];
-  int sent_to_ports[NUMBER_OF_NETWORK1_PARTICIPANTS];
 			     
   int receiving_poll[NUMBER_OF_NETWORK1_PARTICIPANTS];  // redundant // !*
   int sending_poll[NUMBER_OF_NETWORK1_PARTICIPANTS];    // redundant // !*
+  
+  int sendable[NUMBER_OF_NETWORK1_PARTICIPANTS];  // makes it easier to know id sendable or receiveable
+  int receiveable[NUMBER_OF_NETWORK1_PARTICIPANTS];  // makes it easier to know is receiveable
+  int responsive[NUMBER_OF_NETWORK1_PARTICIPANTS];  // sendable & receiveable
+  int countdown[NUMBER_OF_NETWORK1_PARTICIPANTS];  // if it is sendable + receiveablem there is a counddown
+  int alive[NUMBER_OF_NETWORK1_PARTICIPANTS];  // if the person is alive - 
+  
+  int send_buffer_full[NUMBER_OF_NETWORK1_PARTICIPANTS]; // cause a delay
+  int send_buffer_ready[NUMBER_OF_NETWORK1_PARTICIPANTS]; // ready for wrriting to. Just set the address
+  int send_buffer_missing[NUMBER_OF_NETWORK1_PARTICIPANTS]; // no problem really.  If missing, state 3 waits until  
+  int recv_buffer_full[NUMBER_OF_NETWORK1_PARTICIPANTS]; // cause a delay
+  int recv_buffer_ready[NUMBER_OF_NETWORK1_PARTICIPANTS]; // ready for wrriting to. Just set the address
+  int recv_buffer_missing[NUMBER_OF_NETWORK1_PARTICIPANTS]; // no problem really.  If missing, state 3 waits until
+
+  // one shows up or calls the defalt callbacks every time just in case
+  
+  /* to load a certain buffer, do this:
+    if send_buffer_ready - copy it, and set the lenght - good to go. - can do this early
+    if send_buffer_full - got to wait
+    if send_buffer_missing - bneed to set up a buffer
+    
+    for static:
+    if(send_buffer_missing - set it then write
+    if (send_buffer_ready) - write
+    
+    else  send_buffer+full 0 tough titties
+    
+    
+    for dynamic:
+    if (send_buffer_ready - copy or wait
+    else if send+buffer_missing - set it
+    else send_buffer_ready
+    
+    by sending the buffer in dynamic mode, it will be the first on the list
+    but also you can run queues and then its cool 0 thats for network2.h
+     will need things random, otherwise we are round robinning too much
+    sendable, receiveable, responsive is whether or not to do network2 stuff
+    
+    dynamic CAN process cia mode 3 checks with the callbacks,
+    or you can do things in the triggers in the rounds
+    or you can do thins inbetween poll calls.
+    
+    
+    receiver buffer is similar
+    the automated system loads receiver buffers  when the receiver is fulll, by calling the triffer.
+    the 5 logic does its best to assume static, and just clead the id -- only with an empty receiver will it run
+    
+    for sendongg - sends only when its full.,  if enpty len will try ot
+    if empty - will try to pull another empty one
+    
+networjk_attempt_send needs it full
+    
+    */
+
+      
+   
+  
+  
+  
+  
+  
 
   
   int call_rounds[MAX_NUMBER_OF_POLLS];  
@@ -59,27 +120,45 @@ typedef struct network1_complete {
   struct timeval local_delay_work[MAX_NUMBER_OF_POLLS];  // wait until this time is passed
   
   
-  struct timeval local_network1_check_start_time;  // time when poll_ckeck start time first called
+  struct timeval local_check_start_time;  // time when poll_ckeck start time first called
   
-  int metwork1_check_poll_runs_in_call; // 0 to  NETWORK1_POLL_CHECK_MAX_POLL_CALLS
-  struct timeval local_poll_check_poll_start_time[NETWORK1_POLL_CHECK_MAX_POLL_CALLS];  // time poll was last called
+  int network1_check_poll_runs_in_call; // 0 to  NETWORK1_POLL_CHECK_MAX_POLL_CALLS
+  struct timeval local_poll_predo_start_time[NETWORK1_POLL_CHECK_MAX_POLL_CALLS];  // time poll check was last called
+  struct timeval local_poll_predo_end_time[NETWORK1_POLL_CHECK_MAX_POLL_CALLS];  // time poll was last called
+  
   struct timeval local_poll_end_time[NETWORK1_POLL_CHECK_MAX_POLL_CALLS];  // time poll was last ended  struct timeval local_round1_end_time; // later time after round 1
-  struct timeval local_handle_poll_end_time[NETWORK1_POLL_CHECK_MAX_POLL_CALLS];  // time poll was last ended  struct timeval local_round1_end_time; // later time after round 1
   
+  struct timeval local_handle_end_time[NETWORK1_POLL_CHECK_MAX_POLL_CALLS]; // time after round 1
   struct timeval local_round1_end_time[NETWORK1_POLL_CHECK_MAX_POLL_CALLS]; // time after round 1
   struct timeval local_round2_end_time[NETWORK1_POLL_CHECK_MAX_POLL_CALLS]; // time after round 2
   struct timeval local_round3_end_time[NETWORK1_POLL_CHECK_MAX_POLL_CALLS]; // time after round 3
+  struct timeval local_postdo_end_time[NETWORK1_POLL_CHECK_MAX_POLL_CALLS]; // time after round 3
   
   struct timeval local_network1_check_end_time;  // time after the entire call
   
   int broadcast_permission[MAX_NUMBER_OF_POLLS];
       
-  int poll_state[MAX_NUMBER_OF_POLLS]; // 0 - not set up 1 - set up and bound , 2 -> waiting for connect or listen, 3 -> connect or listen, 4-> try to read or send 5 ->  5 will clear out new send buffer if it is full after the rounds, then sets to 3
+  int poll_state[MAX_NUMBER_OF_POLLS]; // 0 - not set up 1 - set up and bound , 2 -> waiting for connect or listen, 3 -> connect or listen, 4-> try to read or send 
+       // 5 ->  5 will clear out new send buffer if it is full after the rounds, then sets to 3 and gets a new address
+       // 6 -> we just disconnected, one packet was lost - the one before from what I can see.  -- so we should wait for a bit before pumping extras down the pike
+       // 7 -> we are in the 10 count. about to quit
+       // 8 -> we  will reestablish or allow a new player to come in? maybe - will ping once a second
+       // 9 -> ???
+       // anything above 6 sets sendable to 0
+       // also - any delay sets sendable to 0 -- also if 4 or 2 or 1 or 0 seet sendable to 0
+       // if there are buffers to get on 3, we are good to go, otherwise set sendable to 0
+       // receiveable is also 0 - these are done for players, not per poll
+       
                                        // so if we call set_send_outout or something like that, the calling stuff will force 3 to 5, ohterwise 5 will clear.  This allows multiple sends, well at least 2
                                        
   int communicator[MAX_NUMBER_OF_POLLS]; /* player number this is from, or the monitor */ // !*
   int direction[MAX_NUMBER_OF_POLLS];  //  computed to see what the dircetion is for receiving --- then we swap it for output  // *-
-  int ports[MAX_NUMBER_OF_POLLS]; // yes, this is stored here, and also in poll_addresses// !*
+  int ports[MAX_NUMBER_OF_POLLS]; // yes, this is stored here, and also in poll_addresses 
+  
+  struct sockaddr_in sending_to[MAX_NUMBER_OF_POLLS];
+  int sent_to_ports[MAX_NUMBER_OF_POLLS];
+  
+  
   int sockets[MAX_NUMBER_OF_POLLS]; // each socket for each side of a poll 
   struct sockaddr_in poll_addresses[MAX_NUMBER_OF_POLLS]; // virtual addresses through nebula - that we send or receive. has the addresses
   struct pollfd pollfds[MAX_NUMBER_OF_POLLS];
@@ -97,9 +176,9 @@ typedef struct network1_complete {
   network1_complete_round_call network1_handle_action_round3[MAX_NUMBER_OF_POLLS]; /* action after first set complete run */
   network1_complete_round_call network1_action_finish_round3; /* we are to finish a round */
   
-  network1_complete_round_call network1_get_new_receive_buffer; /* get a new receive buffer for this poll -  */
-  network1_complete_round_call network1_get_new_end_buffer; /* get a new send buffer - 0 length  - just to fill up  - why? */
-  network1_complete_round_call network1_pull_next_send_buffer_from_queue; /* get a semd buffer off the queue for this polling address - returns queue length somehow */
+  network1_complete_round_call network1_get_new_receive_buffer[MAX_NUMBER_OF_POLLS]; /* get a new receive buffer for this poll -  */
+  network1_complete_round_call network1_get_new_send_buffer[MAX_NUMBER_OF_POLLS]; /* get a new send buffer - 0 length  - just to fill up  - why? */
+  network1_complete_round_call network1_pull_next_send_buffer_from_queue[MAX_NUMBER_OF_POLLS]; /* get a semd buffer off the queue for this polling address - returns queue length somehow */
   
 } network1_complete;
 
