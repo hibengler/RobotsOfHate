@@ -1,10 +1,10 @@
-CFLAGS = -g -p
-LDFLAGS = 
+CFLAGS = -g -p -pthread
+LDFLAGS =  -lpthread
 
 
 
 #system: test_superpos superpos.a 
-system: test_superpos test2_draw_superpos test3_draw_robots test4_with_sound
+system: test_superpos test2_draw_superpos test3_draw_robots test4_with_sound test5_player
 
 
 test_superpos: test_superpos.o superpos.o
@@ -66,6 +66,8 @@ test4_with_sound:  superpos.o hibfonts.a larry_harvey_has_a_possee.o player.o \
 	       -ldl -lrt -lX11 -lm -DPLATFORM_DESKTOP -pthread
 	       
 
+test5_player: test5_player.o network1.o
+	gccp $(LDFLAGS)  -g -o test5_player test5_player.o network1.o
 
 
 test4_with_sound.o: test4_with_sound.c superpos.h	
@@ -92,4 +94,12 @@ simple_sound_alsa.o: simple_sound_alsa.c
 
 simple_packet_summary.o: simple_packet_summary.c
 	gcc -c  $(CFLAGS)  -Wl,-rpath -Wl,LIBDIR  simple_packet_summary.c
+
+
+test5_player.o: test5_player.c network1.h
+	gcc -c  $(CFLAGS)  -Wl,-rpath -Wl,LIBDIR  test5_player.c
+
+network1.o: network1.c network1.h
+	gcc -c  $(CFLAGS)  -Wl,-rpath -Wl,LIBDIR  network1.c
+
 

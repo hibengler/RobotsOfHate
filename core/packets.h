@@ -1,4 +1,16 @@
 
+/*
+Packets are from, to
+we have 6 froms, and 6 tos
+
+
+bichannel - 
+
+
+
+*/
+
+
 
 /* OK - we have 5 players
 
