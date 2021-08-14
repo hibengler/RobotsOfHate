@@ -57,13 +57,17 @@ while (running) {
 void do_in1(struct network1_complete *c,int i, int n) {
 fprintf(stderr,"calling do_in1  poll state is %d\r\n",c->poll_state[i]);
 int communicator = c->communicator[i];
-c->buffers[i][c->buflen[i]]='\0';
-if (c->poll_state[i]==5) {
+if (c->poll_state[i]>=6) {
+  fprintf(stderr,"xxx");
+}
+else if (c->poll_state[i]==5) {
+  c->buffers[i][c->buflen[i]]='\0';
   strcat(received_buffers[communicator],c->buffers[i]);
   if (strlen(received_buffers[communicator])>60) {
     strcpy(received_buffers[communicator], received_buffers[communicator] +strlen(received_buffers[communicator])-60);
     }
   c->buflen[i]=0;
+  c->poll_state[i]=3;
   }
 fprintf(stderr,"r");  
 }
@@ -77,38 +81,31 @@ fprintf(stderr,"r");
 
 void do_out1(struct network1_complete *c,int i, int n) { 
 fprintf(stderr,"calling do_out1  poll state is %d\r\n",c->poll_state[i]);
+if (c->poll_state[i]>=6) {
+  fprintf(stderr,"xxx1");
+}
+else if (c->poll_state[i]==5) {
 int communicator = c->communicator[i];
-c->buffers[i][c->buflen[i]]='\0';
-if (c->poll_state[i]==5) {
+  c->buffers[i][c->buflen[i]]='\0';
   strcat(sent_buffers[communicator],c->buffers[i]);
   if (strlen(sent_buffers[communicator])>60) {
     strcpy(sent_buffers[communicator], sent_buffers[communicator] +strlen(sent_buffers[communicator])-60);
     }
   fprintf(stderr,"w");  
   c->buflen[i]=0;
+  c->buffers[i][c->buflen[i]]='\0';
+  c->poll_state[i]=3;
   }
-fprintf(stderr,"x");  
-
-
-
 }
 
 
 
 void do_in3(struct network1_complete *c,int i, int n) {
-//if (c->poll_state[i]==5) {
-//  c->poll_state[i]=3;
-//  c->buflen[i]=0;
-//  }
-//if (c->poll_state[i]==3) {
-//  c->buflen[i]=0;
-//  }
 }
 
 
 
 void do_out3(struct network1_complete *c,int i, int n) {
-fprintf(stderr,"calling do_out3  poll state is %d\r\n",c->poll_state[i]);
 }
 
 void get_receive_buffer(struct network1_complete *c,int i, int n) {}
@@ -126,7 +123,8 @@ sprintf(s,"%4ld",am);
 
 int output_screen(network1_complete *c,int result) {
 
-fprintf(stdout,"%c[2J%c[1;1HPlayer %d\r\nrecv  sent\r\nstatus              Conversation\r\n",(char)27,(char)27,c->participant_number);
+//fprintf(stdout,"%c[2J%c[1;1HPlayer %d\r\nrecv  sent\r\nstatus              Conversation\r\n",(char)27,(char)27,c->participant_number);
+fprintf(stdout,"%c[2J%c[1;1HPlayer %d\r\nrecv  sent\r\nstatus              Conversation\r\n",(char)32,(char)32,c->participant_number);
 for (int i=0;i<12;i++) {
   fprintf(stdout,"%d",c->poll_state[i]);
   }
@@ -137,6 +135,9 @@ for (int i=0;i<12;i++) {
   fprintf(stdout,"%4d 	",c->ports[i]);
   }
 fprintf(stdout,"\r\n");
+for (int i=0;i<12;i++) {
+  fprintf(stdout,"%4d 	",c->sent_to_ports[i]);
+  }
 
 
 for (int i=0;i<6;i++) {
@@ -209,6 +210,8 @@ for (int i=0;i<6;i++) {
   pending_send[i][0]='\0'; 
   c->buffers[i]=&(recv_buffers[i][0]);
   c->buffers[i+6]=&(send_buffers[i][0]);
+  c->buflen[i]=0;
+  c->buflen[i+6]=0;
 //  network1_set_buffer(c,i+6,send_buffers[i],0);
   }          
 
@@ -251,16 +254,18 @@ while (running) {
           if (strlen(convo_buffers[to_player])>60) {
             strcpy(convo_buffers[to_player], convo_buffers[to_player] +strlen(convo_buffers[to_player])-60);
             }
-//          if (c->poll_state[6+to_player] ==5) {
-//	    c->poll_state[6+to_player]=3;
-//	    c->buflen[6+to_player]=0;
+          if (c->poll_state[6+to_player] ==5) {
+	    c->poll_state[6+to_player]=3;
+	    c->buflen[6+to_player]=0;
+	    }
 	  
 
           strcat(c->buffers[6+to_player],pending_send[to_player]);
 	  c->buflen[6+to_player] +=l;
 	
 	  pending_send[to_player][0]='\0';
-	  fprintf(stderr, "we are staged for %d  %s\r\n",6+to_player,send_buffers[6+to_player]);
+	  fprintf(stderr, "we are staged for %d  %s %d\r\n",6+to_player,send_buffers[to_player],c->poll_state[to_player+6]);
+	  fprintf(stderr," b1 %lx b2 %lx len %d\n",(long)send_buffers[to_player],(long)(c->buffers[6+to_player]),c->buflen[6+to_player]);
 	  }
        } // if we can send
     }
@@ -268,13 +273,13 @@ while (running) {
   lock_ch3=1;
   int result =  network1_poll_check(c);
   output_screen(c,result);
-//       {
-//        struct timespec thislong;
-//             thislong.tv_sec = 0;
-//             thislong.tv_nsec = 50000000; /* 50 milliseconds */
+       {
+        struct timespec thislong;
+             thislong.tv_sec = 0;
+             thislong.tv_nsec = 50000000; /* 50 milliseconds */
 
-//             nanosleep(&thislong, &thislong);
- //      }
+             nanosleep(&thislong, &thislong);
+      }
   
 
   }

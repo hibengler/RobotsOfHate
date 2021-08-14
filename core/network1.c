@@ -445,7 +445,6 @@ if (connect(c->sockets[bind_id],(struct sockaddr *)&(c->sending_to[bind_id]),siz
   else if (e==EACCES) {
     fprintf(stderr,"EACCES  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
     generic_eacces(c,bind_id);
-    exit(-1);
     }
   else if (e== EPERM) {
        fprintf(stderr,"EPERM  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
@@ -899,12 +898,12 @@ static int network1_set_buffer_if_necessary_and_receive_from_poll(network1_compl
 // assume state is 3 or 5
 // assume i is not player number
 // assume there is no timer
-if ((c->poll_state[bind_id])==5) {
-  fprintf(stderr,"5 wipeout  thtrwrwrw \n");
-  c->poll_state[bind_id] = 3;
-  c->buflen[bind_id]=0;
-  c->buffers[bind_id]=NULL;
-  }
+//if ((c->poll_state[bind_id])==5) {
+//  fprintf(stderr,"5 wipeout  thtrwrwrw \n");
+//  c->poll_state[bind_id] = 3;
+//  c->buflen[bind_id]=0;
+//  c->buffers[bind_id]=NULL;
+//  }
   
 if (c->buffers[bind_id]) {
   if (c->buflen[bind_id]) {
@@ -919,7 +918,7 @@ else {
       }
   }
   
-  
+fprintf(stderr,"receive vyfkenb us %d\n",c->buflen[bind_id]);  
   
 if (c->buffers[bind_id]) {
   if (!(c->buflen[bind_id])) {
@@ -969,7 +968,6 @@ static int network1_send_if_can(network1_complete *c,int bind_id) {
 //assume i is not player number
 // assume thers is no timer
 
-
 if (c->buffers[bind_id]) {
   if (c->buflen[bind_id]) {
     return network1_attempt_send(c,bind_id);
@@ -986,7 +984,7 @@ else {
     }
   }
   
-if ((c->buffers[bind_id]==NULL)&&(c->buflen[bind_id])) {
+if ((c->buffers[bind_id]!=NULL)&&(c->buflen[bind_id])) {
     return network1_attempt_send(c,bind_id);
     }
   else {
@@ -998,6 +996,7 @@ if ((c->buffers[bind_id]==NULL)&&(c->buflen[bind_id])) {
   if (c->buffers[bind_id]) {
     if (c->buflen[bind_id]) {
       return network1_attempt_send(c,bind_id);
+      
       }
     }
   
@@ -1015,7 +1014,27 @@ return 0;
 																																																																      
 																																																																																      
 																																																																																																      
-																																																																																																																																      
+static int error_continuance(network1_complete *c,int i,struct timeval thedate) {
+int communicator = c->communicator[i];
+// block
+struct timeval a,b;
+b = thedate;
+a = c->local_delay_work[i];
+if ((a.tv_sec > b.tv_sec) || (
+     ((a.tv_sec == b.tv_sec) && (a.tv_usec  >= b.tv_usec))) ) { // we are delayed. leave as is
+// maybe     c->pollfd.fd = -1;
+  fprintf(stderr,"%ld %ld   to %ld %6ld rcontinue\n",a.tv_sec,a.tv_usec,b.tv_sec,b.tv_usec);
+  if (i>=NUMBER_OF_NETWORK1_PARTICIPANTS) {
+    c->sendable[communicator] = 0;
+    }
+  else {
+    c->recieveable[communicator] = 0;
+    }
+  return 1;
+  }
+return 0;  
+} 
+
 																																																																																																																																																      
 																																																																																																																																																																      
 																																																																																																																																																																																      
@@ -1025,38 +1044,20 @@ if (c->communicator[i]==c->participant_number) {
   return 1;
   }
 int communicator = c->communicator[i];
-
-
+if (error_continuance(c,i,thedate)) return(1);
 if (c->poll_state[i]==3) {
-  {  // block
-        struct timeval a,b;
-        b = thedate;
-        a = c->local_delay_work[i];
-        if ((a.tv_sec > b.tv_sec) || (
-          (a.tv_sec == b.tv_sec) && (a.tv_usec  >= b.tv_usec))) { // we are delayed. leave as is
-// maybe     c->pollfd.fd = -1;
-          fprintf(stderr,"%ld %ld   to %ld %6ld rcontinue\n",a.tv_sec,a.tv_usec,b.tv_sec,b.tv_usec);
-          if (i<NUMBER_OF_NETWORK1_PARTICIPANTS) {
-            c->sendable[communicator] = 0;
-	    }
-          else {
-            c->recieveable[communicator] = 0;
-            }
-	  return 1;
-	  }
-    } // the 3 block 
   if (!first_time) {    
     if (c->call_rounds[i])    {return 1;} // dont do it
     }   
   if (i<NUMBER_OF_NETWORK1_PARTICIPANTS) {
-    if (c->network1_get_new_receive_buffer[i]) {
+//    if (c->network1_get_new_receive_buffer[i]) {
       network1_set_buffer_if_necessary_and_receive_from_poll(c,i);
-      }
+//      }
     }
   else if (i<NUMBER_OF_NETWORK1_PARTICIPANTS_TIMES_2) {
-    if ((c->network1_get_new_send_buffer[i])||(c->network1_pull_next_send_buffer_from_queue[i])) {
+ //   if ((c->network1_get_new_send_buffer[i])||(c->network1_pull_next_send_buffer_from_queue[i])) {
       network1_send_if_can(c,i);
-      }
+ //     }
     }
   // now we ran, if there is no buffer, but I thinkg its still sendable
       
@@ -1077,24 +1078,8 @@ if (c->poll_state[i]==3) {
       }  
     }	 // if state 3 moves - make sure we call the triggers  
       	
-  {
-        struct timeval a,b;
-        b = thedate;
-        a = c->local_delay_work[i];
-        if ((a.tv_sec > b.tv_sec) || (
-          (a.tv_sec == b.tv_sec) && (a.tv_usec  >= b.tv_usec))) { // we are delayed. leave as is
-// maybe     c->pollfd.fd = -1;
-          fprintf(stderr,"%ld %ld   to %ld %6ld rcontinue\n",a.tv_sec,a.tv_usec,b.tv_sec,b.tv_usec);
-          if (i<NUMBER_OF_NETWORK1_PARTICIPANTS) {
-            c->sendable[communicator] = 0;
-	    }
-          else {
-            c->recieveable[communicator] = 0;
-            }
-	  return(1); // 1 means continue
-          }
-//        fprintf(stderr,"%ld %ld   to %ld %6ld clear\n",a.tv_sec,a.tv_usec,b.tv_sec,b.tv_usec);
-    }	    	    
+  if (error_continuance(c,i,thedate)) return(1);
+
   if ((c->poll_state[i]==2)||(c->poll_state[i]==4)) {
     c->pollfds[i].fd=c->sockets[i];
     }
@@ -1181,74 +1166,73 @@ else if(c->poll_state[ii]==5) {
 
 
 static int process_poll_buffer_status(network1_complete *c,int cm,int compute_statistics_at_end) {
-  int communicator =cm;
-  int ii=c->receiving_poll[communicator];
-
-      
-  int oo=c->sending_poll[communicator];
-  if (c->buffers[ii]) {
-    if (c->buflen[ii]) {
-      c->recv_buffer_full[communicator] = 1;
-      c->recv_buffer_missing[communicator] = 0;
-      c->recv_buffer_ready[communicator] = 0;
-      }
-    else {
-      c->recv_buffer_full[communicator] = 0;
-      c->recv_buffer_missing[communicator] = 0;
-      c->recv_buffer_ready[communicator] = 1;
-      }
+int communicator =cm;
+int ii=c->receiving_poll[communicator];
+int oo=c->sending_poll[communicator];
+compute_statistics_at_end=0; // force it
+if (c->buffers[ii]) {
+  if (c->buflen[ii]) {
+    c->recv_buffer_full[communicator] = 1;
+    c->recv_buffer_missing[communicator] = 0;
+    c->recv_buffer_ready[communicator] = 0;
     }
   else {
     c->recv_buffer_full[communicator] = 0;
-    c->recv_buffer_missing[communicator] = 1;
-    c->recv_buffer_ready[communicator] = 0;
+    c->recv_buffer_missing[communicator] = 0;
+    c->recv_buffer_ready[communicator] = 1;
     }
-  if (compute_statistics_at_end) {
-    if (c->recv_buffer_full[communicator]) {
+  }
+else {
+  c->recv_buffer_full[communicator] = 0;
+  c->recv_buffer_missing[communicator] = 1;
+  c->recv_buffer_ready[communicator] = 0;
+  }
+if (compute_statistics_at_end) {
+  if (c->recv_buffer_full[communicator]) {
+    c->recieveable[communicator]=0;
+    }
+  if (c->poll_state[oo]==4) { // if we are state 4
+    c->recieveable[communicator]=1;
+    }
+  else {
+    if (!c->recv_buffer_missing[communicator]) {
       c->recieveable[communicator]=0;
       }
-    if (c->poll_state[oo]==4) { // if we are state 4
-      c->recieveable[communicator]=1;
-      }
-    else {
-      if (!c->recv_buffer_missing[communicator]) {
-        c->recieveable[communicator]=0;
-        }
-      }
-    } 
+    }
+  } 
     
     
 
-  if (c->buffers[oo]) {
-    if (c->buflen[oo]) {
-      c->send_buffer_full[communicator]=1;
-      c->send_buffer_ready[communicator]=0;
-      c->send_buffer_missing[communicator]=0;
-      }
-    else {
-      c->send_buffer_full[communicator]=0;
-      c->send_buffer_ready[communicator]=1;
-      c->send_buffer_missing[communicator]=0;
-      }
+if (c->buffers[oo]) {
+  if (c->buflen[oo]) {
+    c->send_buffer_full[communicator]=1;
+    c->send_buffer_ready[communicator]=0;
+    c->send_buffer_missing[communicator]=0;
     }
   else {
     c->send_buffer_full[communicator]=0;
-    c->send_buffer_ready[communicator]=0;
-    c->send_buffer_missing[communicator]=1;
+    c->send_buffer_ready[communicator]=1;
+    c->send_buffer_missing[communicator]=0;
     }
+  }
+else {
+  c->send_buffer_full[communicator]=0;
+  c->send_buffer_ready[communicator]=0;
+  c->send_buffer_missing[communicator]=1;
+  }
   
-  if (compute_statistics_at_end) {
-    if (c->poll_state[oo]==4)  {
-      if (!c->send_buffer_full[communicator]) {
-        c->sendable[communicator]=0;
-	}
-      }
-    else if (c->poll_state[oo]==3)  {
-      if (c->send_buffer_missing[communicator]) {
-        c->sendable[communicator]=0;
-	}
+if (compute_statistics_at_end) {
+  if (c->poll_state[oo]==4)  {
+    if (!c->send_buffer_full[communicator]) {
+      c->sendable[communicator]=0;
       }
     }
+  else if (c->poll_state[oo]==3)  {
+    if (c->send_buffer_missing[communicator]) {
+      c->sendable[communicator]=0;
+      }
+    }
+  }
 
 return 0;
 }
@@ -1323,25 +1307,8 @@ for (int i=0;i<c->current_number_of_polls;i++) {
     
   go_around_timeouts(c,communicator,c->local_poll_predo_start_time[c->network1_check_poll_runs_in_call]);
       
-    
-  {
-    struct timeval a,b;
-    b = c->local_poll_predo_start_time[c->network1_check_poll_runs_in_call];
-    a = c->local_delay_work[i];
-    if ((a.tv_sec > b.tv_sec) || (
-      (a.tv_sec == b.tv_sec) && (a.tv_usec  >= b.tv_usec))) { // we are delayed. leave as is
-// maybe       c->pollfd.fd = -1;
-      fprintf(stderr,"%ld %ld   to %ld %6ld continue\n",a.tv_sec,a.tv_usec,b.tv_sec,b.tv_usec);
-      if (i<NUMBER_OF_NETWORK1_PARTICIPANTS) {
-        c->recieveable[communicator] = 0;
-	}
-      else {
-        c->sendable[communicator] = 0;
-        }
-       continue;
-       }
-//      fprintf(stderr,"%ld %ld   to %ld %6ld clear\n",a.tv_sec,a.tv_usec,b.tv_sec,b.tv_usec);
-     }
+  if (error_continuance(c,i,c->local_poll_predo_start_time[c->network1_check_poll_runs_in_call]))  continue;
+
   
   if (c->poll_state[i]==0) {
     network1_setup_and_bind(c,i);
@@ -1355,26 +1322,9 @@ for (int i=0;i<c->current_number_of_polls;i++) {
     
     
   if (c->poll_state[i]==5) {  // this was actioned earlier, and we got past the wait time
-    if (i<NUMBER_OF_NETWORK1_PARTICIPANTS) {  
-      if (c->network1_get_new_receive_buffer[i]) {  // if receivers are dynamic
-        c->buffers[i]=NULL; // we are done. wipe it out
+
 	c->buflen[i]=0;
-        }
-      else { // receivers are static 
-	c->buflen[i]=0;  // we are done. just reuse the buffer
-	}
-      } // receiving
-    else { // sending
-      if ((c->network1_get_new_send_buffer[i])
-          || (c->network1_pull_next_send_buffer_from_queue[i])) {  // if senders are dynamic
-        c->buffers[i]=NULL; // we are done
-	c->buflen[i]=0;
-        }    
-      else {
-	c->buflen[i]=0; // keep the buffer around so we can reuse it
-	} // static
-      } // sending
-    c->poll_state[i]=3;
+        c->poll_state[i]=3;
     }
   if (c->poll_state[i]>=6) {  // we are keeping the buffer as is - still need to send it
     c->poll_state[i]=3;
@@ -1407,8 +1357,14 @@ process_poll_buffer_statuses(c,0);
 
 
 
-int number_of_events = poll(&(c->pollfds[0]), c->current_number_of_polls,0);		  
 
+
+
+
+
+
+int number_of_events = poll(&(c->pollfds[0]), c->current_number_of_polls,0);		
+  
 
 
 gettimeofday(&(c->local_poll_end_time[c->network1_check_poll_runs_in_call]),NULL); 
@@ -1431,7 +1387,6 @@ if (!(number_of_events+number_to_round)) {
   c->local_postdo_end_time[c->network1_check_poll_runs_in_call]=		c->local_poll_end_time[c->network1_check_poll_runs_in_call];
   c->local_network1_check_end_time=					        c->local_poll_end_time[c->network1_check_poll_runs_in_call];
   
-  c->network1_check_poll_runs_in_call++;
   goto full_check_poll_loop;
   }
 
@@ -1454,7 +1409,7 @@ if (!(number_of_events+number_to_round)) {
         network1_handle_connect_error(c,i,e);
       
 
-        if (handle_three(c,i, c->local_poll_predo_start_time[c->network1_check_poll_runs_in_call],1)) {
+        if (handle_three(c,i, c->local_poll_end_time[c->network1_check_poll_runs_in_call],0)) {
            continue;
           }     
         } /* if we are ca connect and got a return value  on state 2 */ 
@@ -1483,9 +1438,9 @@ if (!(number_of_events+number_to_round)) {
           network1_handle_send_error(c,i,e);
           }
         else if (c->pollfds[i].revents&POLLOUT) {
-//	  network1_attempt_send(c,i);
+	  network1_attempt_send(c,i);
 fprintf(stderr,"githtotr5r\n");
-          send_gotit(c,i);
+//          send_gotit(c,i);
 //        c->call_rounds[bind_id]=1;
 //	  c->poll_state[bind_id]=5;
 	  }
@@ -1560,7 +1515,6 @@ if (!number_to_round) {
   c->local_postdo_end_time[c->network1_check_poll_runs_in_call]=		c->local_round1_end_time[c->network1_check_poll_runs_in_call];
   c->local_network1_check_end_time			=                       c->local_round1_end_time[c->network1_check_poll_runs_in_call];
   
-  c->network1_check_poll_runs_in_call++;
   goto full_check_poll_loop;
   }
   
@@ -1601,7 +1555,6 @@ if (!number_to_round) {
   c->local_postdo_end_time[c->network1_check_poll_runs_in_call]=		c->local_round2_end_time[c->network1_check_poll_runs_in_call];
   c->local_network1_check_end_time			=                       c->local_round2_end_time[c->network1_check_poll_runs_in_call];
   
-  c->network1_check_poll_runs_in_call++;
   goto full_check_poll_loop;
   }
   
@@ -1642,10 +1595,12 @@ if (!number_to_round) {
   c->local_postdo_end_time[c->network1_check_poll_runs_in_call]=		c->local_round3_end_time[c->network1_check_poll_runs_in_call];
   c->local_network1_check_end_time			=                       c->local_round3_end_time[c->network1_check_poll_runs_in_call];
   
-  c->network1_check_poll_runs_in_call++;
   goto full_check_poll_loop;
   }
   
+
+full_check_poll_loop:
+
 
 network1_reset_sendables_and_stuff(c);
   
@@ -1659,27 +1614,8 @@ for (int i=0;i<c->current_number_of_polls;i++) {
     }
      
 
-  
-  {  // maybe check the time
-    struct timeval a,b;
-    b = c->local_round3_end_time[c->network1_check_poll_runs_in_call];
-    a = c->local_delay_work[i];
-    if ((a.tv_sec > b.tv_sec) || (
-      (a.tv_sec == b.tv_sec) && (a.tv_usec  >= b.tv_usec))) { // we are delayed. leave as is
-// maybe       c->pollfd.fd = -1;
-      fprintf(stderr,"%ld %ld   to %ld %6ld continuex\n",a.tv_sec,a.tv_usec,b.tv_sec,b.tv_usec);
-          if (i<NUMBER_OF_NETWORK1_PARTICIPANTS) {
-            c->sendable[communicator] = 0;
-	    }
-          else {
-            c->recieveable[communicator] = 0;
-            }
-       continue;
-       }
-//      fprintf(stderr,"%ld %ld   to %ld %6ld clearx\n",a.tv_sec,a.tv_usec,b.tv_sec,b.tv_usec);
-    }
-  }   
-
+  if (error_continuance(c,i,c->local_round3_end_time[c->network1_check_poll_runs_in_call]))  continue;
+  }
 compute_sendable_recieveables(c,1); 
 process_poll_buffer_statuses(c,0);  
 
@@ -1690,7 +1626,6 @@ gettimeofday(&(c->local_postdo_end_time[c->network1_check_poll_runs_in_call]),NU
 
 c->network1_check_poll_runs_in_call++;
 
-full_check_poll_loop:
 // later on we can loop around a few times to make it more efficient.
 gettimeofday(&(c->local_network1_check_end_time),NULL);
 
