@@ -1,3 +1,6 @@
+
+
+
 #ifndef NETWORK1_H 
 #define NETWORK1_H 1
 
@@ -49,7 +52,7 @@ typedef struct network1_complete {
   int sending_poll[NUMBER_OF_NETWORK1_PARTICIPANTS];    // redundant // !*
   
   int sendable[NUMBER_OF_NETWORK1_PARTICIPANTS];  // makes it easier to know id sendable or receiveable
-  int receiveable[NUMBER_OF_NETWORK1_PARTICIPANTS];  // makes it easier to know is receiveable
+  int recieveable[NUMBER_OF_NETWORK1_PARTICIPANTS];  // makes it easier to know is receiveable
   int responsive[NUMBER_OF_NETWORK1_PARTICIPANTS];  // sendable & receiveable
   int countdown[NUMBER_OF_NETWORK1_PARTICIPANTS];  // if it is sendable + receiveablem there is a counddown
   int alive[NUMBER_OF_NETWORK1_PARTICIPANTS];  // if the person is alive - 
@@ -229,7 +232,7 @@ This assumes 6 (well, 5) inputs and 6 (well 5) outputs. We do not send to oursel
 
 
 
-extern int network1_set_buffer(network1_complete *c,int bind_id,char *buffer, int buflen);
+extern int network1_set_buffer(network1_complete *c,int bind_id,char *buffer, int buflen,int force_flag);
 
 
           
