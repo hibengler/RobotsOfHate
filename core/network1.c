@@ -792,7 +792,7 @@ return (0);
 	    
 
 static int network1_attempt_send(network1_complete *c,int bind_id) {
-fprintf(stderr,"Atempt to send id %d %s\n",bind_id,c->buffers[bind_id]);
+fprintf(stderr,"Attempt to send id %d %s\n",bind_id,c->buffers[bind_id]);
 int e=0;
 c->poll_state[bind_id]=4;  // waiting for read
 int result = send(c->sockets[bind_id],&(c->buffers[bind_id][0]),NETWORK1_MAX_BUFFER_SIZE,MSG_DONTWAIT|MSG_CONFIRM);
@@ -800,6 +800,7 @@ if (result==0) {  // end of file
   send_eof(c,bind_id);
   }
 else if (result >0) {
+  fprintf(stderr,"gotit1\n");
   send_gotit(c,bind_id);
   }
 else {    
@@ -1392,6 +1393,9 @@ for (int i=0;i<c->current_number_of_polls;i++) {
   
   }  // our clean up and set  for polling
 
+
+compute_sendable_recieveables(c,1); 
+process_poll_buffer_statuses(c,0);  
   
 
   
@@ -1450,7 +1454,7 @@ if (!(number_of_events+number_to_round)) {
         network1_handle_connect_error(c,i,e);
       
 
-        if (handle_three(c,i, c->local_poll_predo_start_time[c->network1_check_poll_runs_in_call],0)) {
+        if (handle_three(c,i, c->local_poll_predo_start_time[c->network1_check_poll_runs_in_call],1)) {
            continue;
           }     
         } /* if we are ca connect and got a return value  on state 2 */ 
@@ -1479,6 +1483,8 @@ if (!(number_of_events+number_to_round)) {
           network1_handle_send_error(c,i,e);
           }
         else if (c->pollfds[i].revents&POLLOUT) {
+//	  network1_attempt_send(c,i);
+fprintf(stderr,"githtotr5r\n");
           send_gotit(c,i);
 //        c->call_rounds[bind_id]=1;
 //	  c->poll_state[bind_id]=5;
