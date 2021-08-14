@@ -192,8 +192,8 @@ return   generic_tozero_screw_sockets(c,bind_id,2000);
 }
 
 static int send_econnrefused(network1_complete *c, int bind_id) {
-//return   generic_tothree(c,bind_id,200);
-return   generic_tozero(c,bind_id,200);
+return   generic_tothree(c,bind_id,200);
+//return   generic_tozero(c,bind_id,200);
 }
 
 static int generic_econnrefused(network1_complete *c, int bind_id) {
@@ -1092,7 +1092,7 @@ if (c->poll_state[i]==3) {
             }
 	  return(1); // 1 means continue
           }
-        fprintf(stderr,"%ld %ld   to %ld %6ld clear\n",a.tv_sec,a.tv_usec,b.tv_sec,b.tv_usec);
+//        fprintf(stderr,"%ld %ld   to %ld %6ld clear\n",a.tv_sec,a.tv_usec,b.tv_sec,b.tv_usec);
     }	    	    
   if ((c->poll_state[i]==2)||(c->poll_state[i]==4)) {
     c->pollfds[i].fd=c->sockets[i];
@@ -1339,7 +1339,7 @@ for (int i=0;i<c->current_number_of_polls;i++) {
         }
        continue;
        }
-      fprintf(stderr,"%ld %ld   to %ld %6ld clear\n",a.tv_sec,a.tv_usec,b.tv_sec,b.tv_usec);
+//      fprintf(stderr,"%ld %ld   to %ld %6ld clear\n",a.tv_sec,a.tv_usec,b.tv_sec,b.tv_usec);
      }
   
   if (c->poll_state[i]==0) {
@@ -1670,7 +1670,7 @@ for (int i=0;i<c->current_number_of_polls;i++) {
             }
        continue;
        }
-      fprintf(stderr,"%ld %ld   to %ld %6ld clearx\n",a.tv_sec,a.tv_usec,b.tv_sec,b.tv_usec);
+//      fprintf(stderr,"%ld %ld   to %ld %6ld clearx\n",a.tv_sec,a.tv_usec,b.tv_sec,b.tv_usec);
     }
   }   
 
