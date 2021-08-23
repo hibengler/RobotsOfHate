@@ -1265,6 +1265,7 @@ if (c->poll_state[i]==3) {
     }
     
   if ((c->poll_state[i]==4)) {
+    fprintf(stderr,"hey 44444444\n");
     c->pollfds[i].fd=c->sockets[i];
     }
       
@@ -1511,8 +1512,8 @@ for (int i=0;i<c->current_number_of_polls;i++) {
 network1_reset_sendables_and_stuff(c);
 /* clear out revents, and turn off write polls if not necessary. read polls are necessary */
 for (int i=0;i<c->current_number_of_polls;i++) {
+  fprintf(stderr,"pos %d state %d\n",i,c->poll_state[i]);
   clear_errno(c,i);
-  fprintf(stderr,"poll %d\n",i);
   if ((c->type[i]==2)) {
     if (c->poll_state[i]==3) {
       if (c->buffers[i]) {
@@ -1551,19 +1552,15 @@ for (int i=0;i<c->current_number_of_polls;i++) {
       continue;
       }
     
-    fprintf(stderr,"mid %d\n",i);
     go_around_timeouts(c,communicator,c->local_poll_predo_start_time[c->network1_check_poll_runs_in_call]);
       
-    fprintf(stderr,"more %d\n",i);
     if (error_continuance(c,i,c->local_poll_predo_start_time[c->network1_check_poll_runs_in_call]))  {
       clear_errno(c,i);
       continue;
       }
 
   
-    fprintf(stderr,"more2 %d\n",i);
     if (c->poll_state[i]==0) {
-      fprintf(stderr,"more23%d\n",i);
       if (!network1_setup_and_bind(c,i)) {
         fprintf(stderr,"cannot bind port\n") ;return(-1);
 	}
@@ -1587,6 +1584,7 @@ for (int i=0;i<c->current_number_of_polls;i++) {
 
     if ((c->poll_state[i]==4)) {
       c->pollfds[i].fd=c->sockets[i];
+      fprintf(stderr,"waiting on id %d socket %d\n",i,c->sockets[i]);
       }
 
     if (handle_three(c,i, c->local_poll_predo_start_time[c->network1_check_poll_runs_in_call],1)) {
@@ -1717,9 +1715,9 @@ if (!(number_of_events+number_to_round)) {
           network1_handle_send_error(c,i,e);
           }
         else if (c->pollfds[i].revents&POLLOUT) {
-	  fprintf(stderr,"gsyfiqwgydsqjh bhlghgbhjlhjl\n");
-	  network1_attempt_send(c,i);
-fprintf(stderr,"githtotr5r\n");
+	  fprintf(stderr,"Poll says ok\n");
+	  //network1_attempt_send(c,i);
+          fprintf(stderr,"githtotr5r\n");
           send_gotit(c,i);
 //        c->call_rounds[bind_id]=1;
 //	  c->poll_state[bind_id]=5;

@@ -86,6 +86,7 @@ else if (c->poll_state[i]==5) {
 
 
 void do_out1(struct network1_complete *c,int i, int n) { 
+fprintf(stderr,"			out1\n\n");
 if (c->poll_state[i]>=6) {
   fprintf(stderr,"xxx1");
 }
