@@ -349,7 +349,7 @@ return   generic_tozero_screw_sockets(c,bind_id,2000);
 }
 
 static int send_econnrefused(network1_complete *c, int bind_id) {
-return   generic_tothree(c,bind_id,200);
+return   generic_tothree(c,bind_id,100);
 //return   generic_tozero(c,bind_id,200);
 }
 
@@ -745,7 +745,7 @@ else {
 //      network1_delay_for_milliseconds(c,bind_id,1000);
       }
     else {
-      fprintf(stderr,"  recva generic errno  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
+       fprintf(stderr,"  recva generic errno  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
       generic_eother(c,bind_id);
 //      c->sockets[bind_id]=-1;
 //      c->pollfds[bind_id].fd = -1;
@@ -875,7 +875,6 @@ return (0);
 
 static int network1_handle_send_error(network1_complete *c,int bind_id,int e) {
 //c->poll_state[bind_id]=4;  // waiting for read
-//int result = send(c->sockets[bind_id],&(c->buffers[bind_id][0]),NETWORK1_MAX_BUFFER_SIZE,MSG_DONTWAIT);
 fprintf(stderr,"handle out e is %d\n",e);
 if (e==0) {  // end of file
   send_eof(c,bind_id);
@@ -974,11 +973,31 @@ return (0);
 	    
 
 static int network1_attempt_send(network1_complete *c,int bind_id) {
-fprintf(stderr,"Attempt to send id %d %s\n",bind_id,c->buffers[bind_id]);
 int e=0;
-c->poll_state[bind_id]=4;  // waiting for read
-int result = send(c->sockets[bind_id],c->buffers[bind_id],c->buflen[bind_id],MSG_DONTWAIT|MSG_CONFIRM|MSG_NOSIGNAL);
-//int result = sendto(c->sockets[bind_id],&(c->buffers[bind_id][0]),c->buflen[bind_id],0,(struct sockaddr *)&(c->sending_to[bind_id]),sizeof(struct sockaddr_in));
+ e=errno; 
+ int e2= nerrnoi(c,bind_id);
+fprintf(stderr,"Attempt to send id %d %s initial e1 %d e2 %d\n",bind_id,c->buffers[bind_id],e,e2);
+e=0; 
+//c->poll_state[bind_id]=4;  // waiting for read
+{
+int sd;
+ unsigned char ip[300];
+  inet_ntop (AF_INET, &c->poll_addresses[bind_id].sin_addr, ip,300);
+ int port = htons (c->poll_addresses[bind_id].sin_port);
+  fprintf (stderr,"	from %s:%d	", ip, port);
+  }
+{
+int sd;
+ unsigned char ip[300];
+  inet_ntop (AF_INET, &c->sending_to[bind_id].sin_addr, ip,300);
+ int port = htons (c->sending_to[bind_id].sin_port);
+  fprintf (stderr,"to %s:%d\n", ip, port);
+  }
+
+int result = send(c->sockets[bind_id],c->buffers[bind_id],c->buflen[bind_id],0);
+//int result = send(c->sockets[bind_id],c->buffers[bind_id],c->buflen[bind_id],MSG_CONFIRM|MSG_NOSIGNAL);
+//int result = sendto(c->sockets[bind_id],&(c->buffers[bind_id][0]),c->buflen[bind_id],MSG_DONTWAIT|MSG_CONFIRM|MSG_NOSIGNAL,(struct sockaddr *)&(c->sending_to[bind_id]),sizeof(struct sockaddr_in));
+//int result = sendto(c->sockets[bind_id],&(c->buffers[bind_id][0]),c->buflen[bind_id],MSG_CONFIRM,(struct sockaddr *)&(c->sending_to[bind_id]),sizeof(struct sockaddr_in));
 fprintf(stderr," sd %d got out %d of %d from %d to %d\n",bind_id,result,c->buflen[bind_id],c->ports[bind_id],c->sent_to_ports[bind_id]);
 
 if (result==0) {  // end of file
@@ -987,8 +1006,10 @@ if (result==0) {  // end of file
 else if (result >0) {
   e= nerrno(c,bind_id);
   if ((e==EAGAIN)||(e==EWOULDBLOCK)||(e==EINPROGRESS)) {
-    fprintf(stderr,"wait on it\n");
-    send_in_progress(c,bind_id);
+ //   fprintf(stderr,"would wait on it\n");
+    fprintf(stderr,"gotit2\n");
+    send_gotit(c,bind_id);
+//    send_in_progress(c,bind_id);
     }
   else if (e==0) {	  
     fprintf(stderr,"gotit1\n");
@@ -1512,8 +1533,8 @@ for (int i=0;i<c->current_number_of_polls;i++) {
 network1_reset_sendables_and_stuff(c);
 /* clear out revents, and turn off write polls if not necessary. read polls are necessary */
 for (int i=0;i<c->current_number_of_polls;i++) {
-  fprintf(stderr,"pos %d state %d\n",i,c->poll_state[i]);
-  clear_errno(c,i);
+  {
+//  clear_errno(c,i);
   if ((c->type[i]==2)) {
     if (c->poll_state[i]==3) {
       if (c->buffers[i]) {
@@ -1536,26 +1557,42 @@ for (int i=0;i<c->current_number_of_polls;i++) {
           } // if there is nothing in the buffer
         } // if we have a buffer
       } // if we have a poll state of 2
-    clear_errno(c,i);
+//    clear_errno(c,i);
     
     continue;
     } // if we art type 2
   else if ((c->type[i]==3)) {
-    clear_errno(c,i);  
+//    clear_errno(c,i);  
     continue;
     }
   else {
+    if (c->sockets[i]!=-1) {
+      int option_len = sizeof(int);
+      int option_value=0;
+      int rc = getsockopt(
+        c->sockets[i], SOL_SOCKET, SO_ACCEPTCONN, (char *) &option_value, &option_len);
+      if (rc == 0)
+      {
+      if (option_len == sizeof(int))
+        {
+            fprintf(stderr,"id %d socket %d acceptconn %d\n",i,c->sockets[i],option_value);
+            }
+      }
+      }
+
+      }
+  
     int communicator =c->communicator[i];
     c->pollfds[i].fd=-1; // dont poll as default 
     if (c->communicator[i]==c->participant_number) {
-      clear_errno(c,i);  
+//      clear_errno(c,i);  
       continue;
       }
     
     go_around_timeouts(c,communicator,c->local_poll_predo_start_time[c->network1_check_poll_runs_in_call]);
       
     if (error_continuance(c,i,c->local_poll_predo_start_time[c->network1_check_poll_runs_in_call]))  {
-      clear_errno(c,i);
+//      clear_errno(c,i);
       continue;
       }
 
@@ -1588,7 +1625,7 @@ for (int i=0;i<c->current_number_of_polls;i++) {
       }
 
     if (handle_three(c,i, c->local_poll_predo_start_time[c->network1_check_poll_runs_in_call],1)) {
-      clear_errno(c,i);
+//      clear_errno(c,i);
       continue;
       }     
 
@@ -1596,7 +1633,7 @@ for (int i=0;i<c->current_number_of_polls;i++) {
     c->pollfds[i].revents=0;
   
     }  // our clean up and set  for polling
-  clear_errno(c,i);
+//  clear_errno(c,i);
   } // for all polls
 
 compute_sendable_recieveables(c,1); 
@@ -1716,9 +1753,9 @@ if (!(number_of_events+number_to_round)) {
           }
         else if (c->pollfds[i].revents&POLLOUT) {
 	  fprintf(stderr,"Poll says ok\n");
-	  //network1_attempt_send(c,i);
+	  network1_attempt_send(c,i);
           fprintf(stderr,"githtotr5r\n");
-          send_gotit(c,i);
+//          send_gotit(c,i);
 //        c->call_rounds[bind_id]=1;
 //	  c->poll_state[bind_id]=5;
 	  }
@@ -2101,8 +2138,8 @@ for (int o=NUMBER_OF_NETWORK1_PARTICIPANTS;o<NUMBER_OF_NETWORK1_PARTICIPANTS_TIM
     struct sockaddr_in inAddr;
     memset ((char *)(& inAddr),0, sizeof(struct sockaddr_in));
     inAddr.sin_family = AF_INET;                 /* Internet address family */
-//  inAddr.sin_addr.s_addr = inet_addr(ips[participant_number]); /* all inqddr go to me. address is the output address*/
-    inAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    inAddr.sin_addr.s_addr = inet_addr(ips[participant_number]); /* all inqddr go to me. address is the output address*/
+//    inAddr.sin_addr.s_addr = htonl(INADDR_ANY);
     inAddr.sin_port = htons(c->ports[o]);         /* listen to our ip address on the given port */
     c->poll_addresses[o] = inAddr;
     }
