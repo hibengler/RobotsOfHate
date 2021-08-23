@@ -994,7 +994,8 @@ int sd;
   fprintf (stderr,"to %s:%d\n", ip, port);
   }
 
-int result = send(c->sockets[bind_id],c->buffers[bind_id],c->buflen[bind_id],0);
+//int result = send(c->sockets[bind_id],c->buffers[bind_id],c->buflen[bind_id],MSG_CONFIRM|MSG_NOSIGNAL);
+int result = send(c->sockets[bind_id],c->buffers[bind_id],c->buflen[bind_id],MSG_CONFIRM|MSG_NOSIGNAL|MSG_DONTWAIT);
 //int result = send(c->sockets[bind_id],c->buffers[bind_id],c->buflen[bind_id],MSG_CONFIRM|MSG_NOSIGNAL);
 //int result = sendto(c->sockets[bind_id],&(c->buffers[bind_id][0]),c->buflen[bind_id],MSG_DONTWAIT|MSG_CONFIRM|MSG_NOSIGNAL,(struct sockaddr *)&(c->sending_to[bind_id]),sizeof(struct sockaddr_in));
 //int result = sendto(c->sockets[bind_id],&(c->buffers[bind_id][0]),c->buflen[bind_id],MSG_CONFIRM,(struct sockaddr *)&(c->sending_to[bind_id]),sizeof(struct sockaddr_in));
@@ -2139,7 +2140,7 @@ for (int o=NUMBER_OF_NETWORK1_PARTICIPANTS;o<NUMBER_OF_NETWORK1_PARTICIPANTS_TIM
     memset ((char *)(& inAddr),0, sizeof(struct sockaddr_in));
     inAddr.sin_family = AF_INET;                 /* Internet address family */
     inAddr.sin_addr.s_addr = inet_addr(ips[participant_number]); /* all inqddr go to me. address is the output address*/
-//    inAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    inAddr.sin_addr.s_addr = htonl(INADDR_ANY);
     inAddr.sin_port = htons(c->ports[o]);         /* listen to our ip address on the given port */
     c->poll_addresses[o] = inAddr;
     }
