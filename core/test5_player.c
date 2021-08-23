@@ -234,7 +234,7 @@ c->buflen[stdin_port] = 0;
       
 to_player = (participant_number+1)%6;
 while (running) {
-    fprintf(stderr,"polling for player %d %d  state %dn\n",to_player,c->poll_state[6+to_player],c->send_buffer_ready[to_player]);
+    fprintf(stderr,"polling for player %d    state  %d  send_buffer_ready %d\n",to_player,c->poll_state[6+to_player],c->send_buffer_ready[to_player]);
     if ( (c->poll_state[6+to_player] <=3)&& (c->send_buffer_ready[to_player]))  {
        int l=strlen(pending_send[to_player]);
        if (l) {
@@ -250,12 +250,16 @@ while (running) {
 	 c->buflen[6+to_player] +=l;
 	
 	 pending_send[to_player][0]='\0';
+	 fprintf(stderr,"pending send filled len %d\n", c->buflen[6+to_player]);
 	 }
        } // if we can send
     
   fprintf(stderr,"poll check\n");
   int result =  network1_poll_check(c);
   fprintf(stderr,"poll checked %d\n",result);
+  if (result==-1) {
+    running=0;
+    }
 //  if (result) {
     output_screen(c,result);
        {

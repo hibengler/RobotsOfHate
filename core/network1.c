@@ -478,6 +478,7 @@ return(1);
 
 // instant connect from type 1 - no polling
 static int network1_connect_to_outside_poll(network1_complete *c, int bind_id) {
+fprintf(stderr,"connecting to %d\n",bind_id);
 if (connect(c->sockets[bind_id],(struct sockaddr *)&(c->sending_to[bind_id]),sizeof(struct sockaddr_in)) ==-1) {
   int e = errno;
   if (e==EAFNOSUPPORT)  {
@@ -541,6 +542,7 @@ if (connect(c->sockets[bind_id],(struct sockaddr *)&(c->sending_to[bind_id]),siz
   }  
 else {
   // we are good - we got the connect no errnos
+  fprintf(stderr,"worked\n");
   connect_worked(c,bind_id);
   }
 return 1;
@@ -1408,7 +1410,9 @@ for (int i=0;i<c->current_number_of_polls;i++) {
 
   
     if (c->poll_state[i]==0) {
-      network1_setup_and_bind(c,i);
+      if (!network1_setup_and_bind(c,i)) {
+        fprintf(stderr,"cannot bind port\n") ;return(-1);
+	}
       }
     if (c->poll_state[i]==1) {
       network1_connect_to_outside_poll(c,i);
@@ -1958,6 +1962,7 @@ for (int o=NUMBER_OF_NETWORK1_PARTICIPANTS;o<NUMBER_OF_NETWORK1_PARTICIPANTS_TIM
     memset ((char *)(& sendToAddr),0, sizeof(struct sockaddr_in));
     sendToAddr.sin_family = AF_INET;                 /* Internet address family */
     sendToAddr.sin_addr.s_addr = inet_addr(ips[communicator]); /* all inqddr go to me. address is the output address*/
+    fprintf(stderr,"to for %d is %s : %d\n",o,ips[communicator],sendToAddr.sin_addr.s_addr);
 //    sendToAddr.sin_addr.s_addr = htonl(INADDR_ANY);
     sendToAddr.sin_port = htons(c->sent_to_ports[o]);         /* listen to our ip address on the given port */
     c->sending_to[o] = sendToAddr;                      
