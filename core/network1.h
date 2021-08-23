@@ -117,7 +117,7 @@ networjk_attempt_send needs it full
         
   int buflen[MAX_NUMBER_OF_POLLS];
   char *buffers[MAX_NUMBER_OF_POLLS];
-
+  int temp_dont_poll_yet[MAX_NUMBER_OF_POLLS];
 
   int change_buffer_flag[MAX_NUMBER_OF_POLLS]; // true if the buffer is being changed by out calls, false otherwise
   int type[MAX_NUMBER_OF_POLLS]; // 0 - read from sender, 1 - send to receiver, 2 - read from standard file, 3 - write from standard file

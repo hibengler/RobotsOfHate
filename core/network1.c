@@ -45,6 +45,90 @@ id	player	sendto		sendport	recvport
 						5000+12*sendto+player
 */
 
+static int nerrno(network1_complete *c, int bind_id) {
+        int e = 0;
+	int initiale=errno;
+	if (initiale!=0) {
+	  if (initiale!=11) {
+  	    fprintf(stderr,"Xerror %d id %d\n",initiale,bind_id);
+	    }
+	  }
+if ((c->type[bind_id]==1)||(c->type[bind_id]==0)) {
+	do {
+  	  socklen_t lenn=sizeof(int);
+	  if (c->sockets[bind_id]==-1) {
+	    return initiale;
+	    }	    
+          getsockopt(c->sockets[bind_id],SOL_SOCKET,SO_ERROR,(void *)&e,&lenn);
+	  if (!e) break;
+	  if (initiale==0) {
+	    initiale=e;
+	    fprintf(stderr,"error %d id %d\n",e,bind_id);
+	    }
+	  else {
+	    fprintf(stderr,"  suberror %d\n",e);
+	    }
+	  } while (1);
+  }
+	return initiale;
+}
+
+// ignore again
+static int nerrnoi(network1_complete *c, int bind_id) {
+        int e = 0;
+	int initiale=errno;
+	if (initiale==11) { initiale=0;}
+	if (initiale!=0) {
+	  if (initiale!=11) {
+  	    fprintf(stderr,"Xerror %d id %d\n",initiale,bind_id);
+	    }
+	  }
+if ((c->type[bind_id]==1)||(c->type[bind_id]==0)) {
+	do {
+  	  socklen_t lenn=sizeof(int);
+	  if (c->sockets[bind_id]==-1) {
+	    return initiale;
+	    }	    
+          getsockopt(c->sockets[bind_id],SOL_SOCKET,SO_ERROR,(void *)&e,&lenn);
+	  if (e==11) continue;
+	  if (!e) break;
+	  if (initiale==0) {
+	    initiale=e;
+	    fprintf(stderr,"error %d id %d\n",e,bind_id);
+	    }
+	  else {
+	    fprintf(stderr,"  suberror %d\n",e);
+	    }
+	  } while (1);
+	  }
+	return initiale;
+}
+
+
+static int clear_errno(network1_complete *c, int bind_id) {
+        int e = 0;
+	int initiale=errno;
+if ((c->type[bind_id]==1)||(c->type[bind_id]==0)) {
+	if (initiale!=0) {
+	  if (initiale!=11) {
+	    }
+	  }
+	do {
+  	  socklen_t lenn=sizeof(int);
+	  if (c->sockets[bind_id]==-1) {
+	    return initiale;
+	    }	    
+          getsockopt(c->sockets[bind_id],SOL_SOCKET,SO_ERROR,(void *)&e,&lenn);
+	  if (!e) break;
+	  if (initiale==0) {
+	    initiale=e;
+	    }
+	  else {
+	    }
+	  } while (1);
+	  }
+	return initiale;
+}
 
 
 
@@ -52,30 +136,57 @@ id	player	sendto		sendport	recvport
 static int network1_setup_and_bind(network1_complete *c, int bind_id) {
 int s = c->sockets[bind_id];
 if (s==-1) {
-  if ((s=socket(AF_INET, SOCK_DGRAM|SOCK_NONBLOCK, IPPROTO_UDP)) == -1) {
-    fprintf(stderr,"no socket available\n");
+  fprintf(stderr,"new socket id %d\n",bind_id);
+  int e = errno;
+//  if ((s=socket(AF_INET, SOCK_DGRAM|SOCK_NONBLOCK, IPPROTO_UDP)) == -1) {
+  if ((s=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
+    e = errno;
+    fprintf(stderr,"no socket available error %d\n",e);
     return(0);
     }
-  c->sockets[bind_id] = s;
+  else {
+    c->sockets[bind_id] = s;
+    e = nerrnoi(c,bind_id); 
+    if (e) {
+      fprintf(stderr,"something is wrong new socket %d id %d  error %d\n",s,bind_id,e);
+      c->sockets[bind_id]=-1;
+      return(0);
+      }
+    }
   }
 c->broadcast_permission[bind_id] = 0;
 
 if (bind_id > NUMBER_OF_NETWORK1_PARTICIPANTS) {
   /* for ipv6 is IP_MULTICAST_TTL  and other stuff */
-  if (setsockopt(s, SOL_SOCKET, SO_BROADCAST, (void *) &( c->broadcast_permission[bind_id]),
+  if (setsockopt(s, SOL_SOCKET,SO_BROADCAST, (void *) &( c->broadcast_permission[bind_id]),
           sizeof(int)) < 0) { 
      fprintf(stderr,"bd cannot set permission: on poll %d port %d\n",bind_id,c->ports[bind_id]);
      return 0;
      }
   }
-  
+clear_errno(c,bind_id);  
 if( bind(s , (struct sockaddr*)&(c->poll_addresses[bind_id]), sizeof(struct sockaddr_in) ) == -1)
     {
 //    fprintf(stderr,"error bind socket %d id %d port %d\n",s,bind_id,c->ports[bind_id]);
-  int e=errno;
-    fprintf(stderr,"error bind socket %d id %d err %d\n",s,bind_id,e);
-    return(0);
+    int e=nerrnoi(c,bind_id);
+    if (e!=11) {
+      fprintf(stderr,"error bind socket %d id %d err %d\n",s,bind_id,e);
+      return(0);
+      }
     }
+   else 
+   {
+//    fprintf(stderr,"error bind socket %d id %d port %d\n",s,bind_id,c->ports[bind_id]);
+    int e=nerrnoi(c,bind_id);
+    if (e) {
+      if (e!=11) {
+        fprintf(stderr,"error b2ind socket %d id %d err %d\n",s,bind_id,e);
+        return(0);
+	}
+      }
+    }
+ fprintf(stderr,"we are good binding socket %d %d\n",c->sockets[bind_id],bind_id);
+   
 c->poll_state[bind_id]=1;
 return 1;
 }
@@ -110,13 +221,15 @@ c->local_delay_work[bind_id]=a;
 
 /* this unconnects the bingding by seting the famult to AF_UNSPEC; */
 static int network1_unconnect(network1_complete *c,int bind_id) {
+    if (c->sockets[bind_id] ==-1) {return 0;}
        struct sockaddr_in aaa;
        aaa.sin_family = AF_UNSPEC;
        aaa.sin_addr.s_addr= 0;
        aaa.sin_port=0; 
 int e=0;       
+   clear_errno(c,bind_id);
    if (connect(c->sockets[bind_id],(struct sockaddr *)&aaa,sizeof(struct sockaddr_in)) ==-1) {
-          e=errno;
+          e=nerrno(c,bind_id);
           fprintf(stderr,"	EINTR clear connectunlink to connect got errno %d\n",e);
 	  }
 return e;
@@ -181,11 +294,14 @@ static int generic_eaddrnotval(network1_complete *c, int bind_id) {
 return generic_tozero(c,bind_id,100000);
 }
 
-	  
+
+static int connect_worked(network1_complete *c, int bind_id) ;
+
 static int generic_wait_for_connect(network1_complete *c, int bind_id) {
 c->pollfds[bind_id].fd = c->sockets[bind_id];
 c->pollfds[bind_id].events = POLLOUT|POLLERR;
 c->poll_state[bind_id]=2;
+//connect_worked(c,bind_id);
 return 1;
 }
 
@@ -238,7 +354,7 @@ return   generic_tothree(c,bind_id,200);
 }
 
 static int generic_econnrefused(network1_complete *c, int bind_id) {
-return   generic_toone(c,bind_id,1000);
+return   generic_toone(c,bind_id,50);
 }
 
 static int generic_efault(network1_complete *c, int bind_id) {
@@ -280,7 +396,10 @@ return generic_toone(c,bind_id,1000);
 }
 
 static int generic_enotsock(network1_complete *c, int bind_id) {
-return generic_tozero(c,bind_id,1000);
+fprintf(stderr,"socket is set to %d\n",c->sockets[bind_id]);
+network1_unconnect(c,bind_id);
+
+return generic_tozero(c,bind_id,300);
 }
 
 static int connect_worked(network1_complete *c, int bind_id) {
@@ -292,6 +411,12 @@ if (bind_id<NUMBER_OF_NETWORK1_PARTICIPANTS) {
 else {
   c->pollfds[bind_id].events = POLLOUT|POLLERR;
   }
+  
+if (c->type[bind_id]==1) {
+   int result = recv(c->sockets[bind_id],c->buffers[bind_id],NETWORK1_MAX_BUFFER_SIZE,MSG_OOB|MSG_NOSIGNAL|MSG_DONTWAIT);
+   int e=nerrno(c,bind_id); 
+   fprintf(stderr,"did a listen thing id %d result %d \n",bind_id,result);
+   }
 c->poll_state[bind_id]=3;
 return 1;
 }
@@ -480,7 +605,7 @@ return(1);
 static int network1_connect_to_outside_poll(network1_complete *c, int bind_id) {
 fprintf(stderr,"connecting to %d\n",bind_id);
 if (connect(c->sockets[bind_id],(struct sockaddr *)&(c->sending_to[bind_id]),sizeof(struct sockaddr_in)) ==-1) {
-  int e = errno;
+  int e = nerrno(c,bind_id);
   if (e==EAFNOSUPPORT)  {
     fprintf(stderr,"EAFNOSUPPORT  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
     generic_enosupport(c,bind_id);
@@ -554,13 +679,12 @@ return 1;
 
 
 static int network1_handle_receive_error(network1_complete *c,int bind_id,int e) {
-//int result = recv(c->sockets[bind_id],&(c->buffers[bind_id]),NETWORK1_MAX_BUFFER_SIZE,MSG_DONTWAIT);
 fprintf(stderr,"here we are %d\n",e);
 if (e==0) {  // end of file
   receive_eof(c,bind_id);
   }
 else {    
-  int e = errno;
+  int e = nerrno(c,bind_id);
   if (e==0) { // end of file
     receive_eof(c,bind_id);
     }
@@ -640,17 +764,22 @@ return (0);
 
 static int network1_attempt_receive(network1_complete *c,int bind_id, int polled) {
 fprintf(stderr,"recv hey %d\n",polled);
+clear_errno(c,bind_id);
 c->poll_state[bind_id]=4;  // waiting for read
-int result = recv(c->sockets[bind_id],c->buffers[bind_id],NETWORK1_MAX_BUFFER_SIZE,9/*MSG_DONTWAIT*/);
+// MSG_DONTROUTE = later
+int result = recv(c->sockets[bind_id],c->buffers[bind_id],NETWORK1_MAX_BUFFER_SIZE,MSG_OOB|MSG_NOSIGNAL|MSG_DONTWAIT);
+//9/*MSG_DONTWAIT*/);
 fprintf(stderr," rd %d got out %d of %d from %d to %d\n",bind_id,result,c->buflen[bind_id],c->sent_to_ports[bind_id],c->ports[bind_id]);
 if (result==0) {  // end of file
+  clear_errno(c,bind_id);
   receive_eof(c,bind_id);
   }
 else if (result >0) {
+  clear_errno(c,bind_id);
   receive_gotit(c,bind_id,result);
   }
 else {    
-  int e = errno;
+  int e = nerrno(c,bind_id);
   if (e==0) { // end of file
     receive_eof(c,bind_id);
     }
@@ -660,7 +789,7 @@ else {
        if (e==EWOULDBLOCK) {fprintf(stderr,"ewouldblock\n");}
        if (e==EINPROGRESS) {fprintf(stderr,"einprogress\n");}
      
-fprintf(stderr,"recv ogs result %d e %d  hey\n",result,e);
+      fprintf(stderr,"recv in_progress %d  ogs result %d e %d  hey\n",bind_id,result,e);
       receive_in_progress(c,bind_id);
       }   
     else if (e==EBADF) {
@@ -848,23 +977,35 @@ static int network1_attempt_send(network1_complete *c,int bind_id) {
 fprintf(stderr,"Attempt to send id %d %s\n",bind_id,c->buffers[bind_id]);
 int e=0;
 c->poll_state[bind_id]=4;  // waiting for read
-int result = send(c->sockets[bind_id],c->buffers[bind_id],c->buflen[bind_id],MSG_DONTWAIT|MSG_CONFIRM);
+int result = send(c->sockets[bind_id],c->buffers[bind_id],c->buflen[bind_id],MSG_DONTWAIT|MSG_CONFIRM|MSG_NOSIGNAL);
+//int result = sendto(c->sockets[bind_id],&(c->buffers[bind_id][0]),c->buflen[bind_id],0,(struct sockaddr *)&(c->sending_to[bind_id]),sizeof(struct sockaddr_in));
 fprintf(stderr," sd %d got out %d of %d from %d to %d\n",bind_id,result,c->buflen[bind_id],c->ports[bind_id],c->sent_to_ports[bind_id]);
 
 if (result==0) {  // end of file
   send_eof(c,bind_id);
   }
 else if (result >0) {
-  fprintf(stderr,"gotit1\n");
-  send_gotit(c,bind_id);
+  e= nerrno(c,bind_id);
+  if ((e==EAGAIN)||(e==EWOULDBLOCK)||(e==EINPROGRESS)) {
+    fprintf(stderr,"wait on it\n");
+    send_in_progress(c,bind_id);
+    }
+  else if (e==0) {	  
+    fprintf(stderr,"gotit1\n");
+    send_gotit(c,bind_id);
+    }
+  else {
+    goto yuck;
+    }
   }
 else {    
-  e = errno;
+  e = nerrno(c,bind_id);
+yuck:  
   if (e==0) { // end of file
     send_eof(c,bind_id);
     }
   else 	{
-    fprintf(stderr, "got erroe %d    EAGAIN %d\n",e,EAGAIN);	    
+    fprintf(stderr, "got error %d    \n",e);	    
     if ((e==EAGAIN)||(e==EWOULDBLOCK)||(e==EINPROGRESS)) {
       send_in_progress(c,bind_id);
       fprintf(stderr,"we are in progress yo\n");
@@ -1368,22 +1509,24 @@ for (int i=0;i<c->current_number_of_polls;i++) {
 
 
 network1_reset_sendables_and_stuff(c);
-
 /* clear out revents, and turn off write polls if not necessary. read polls are necessary */
 for (int i=0;i<c->current_number_of_polls;i++) {
+  clear_errno(c,i);
+  fprintf(stderr,"poll %d\n",i);
   if ((c->type[i]==2)) {
     if (c->poll_state[i]==3) {
       if (c->buffers[i]) {
         if (!c->buflen[i]) {
+	  int e=errno;
           int result=read(c->sockets[i],&(c->buffers[i][0]),2047);
-//	  fprintf(stderr,"read %lx got %d\n",(long)&(c->buffers[i]),result);
+	  fprintf(stderr,"read sock %d %lx got %d errno %d\n",c->sockets[i],(long)&(c->buffers[i]),result,e);
 	  if (result>=0) {
 	    c->buflen[i]=result;
 	    c->poll_state[i]=5;
 	    c->call_rounds[i]=1;
 	    }
 	  else if (result<0) {
-	    int e=errno;
+  	    int e=errno;
 	    if ((e==EAGAIN)||(e==EWOULDBLOCK)) {
 	      c->poll_state[i]=4;
               c->pollfds[i].fd=c->sockets[i];
@@ -1391,25 +1534,36 @@ for (int i=0;i<c->current_number_of_polls;i++) {
 	    }
           } // if there is nothing in the buffer
         } // if we have a buffer
-      } // if we have a poll state of 3
+      } // if we have a poll state of 2
+    clear_errno(c,i);
+    
     continue;
     } // if we art type 2
   else if ((c->type[i]==3)) {
+    clear_errno(c,i);  
     continue;
     }
   else {
     int communicator =c->communicator[i];
     c->pollfds[i].fd=-1; // dont poll as default 
     if (c->communicator[i]==c->participant_number) {
+      clear_errno(c,i);  
       continue;
       }
     
+    fprintf(stderr,"mid %d\n",i);
     go_around_timeouts(c,communicator,c->local_poll_predo_start_time[c->network1_check_poll_runs_in_call]);
       
-    if (error_continuance(c,i,c->local_poll_predo_start_time[c->network1_check_poll_runs_in_call]))  continue;
+    fprintf(stderr,"more %d\n",i);
+    if (error_continuance(c,i,c->local_poll_predo_start_time[c->network1_check_poll_runs_in_call]))  {
+      clear_errno(c,i);
+      continue;
+      }
 
   
+    fprintf(stderr,"more2 %d\n",i);
     if (c->poll_state[i]==0) {
+      fprintf(stderr,"more23%d\n",i);
       if (!network1_setup_and_bind(c,i)) {
         fprintf(stderr,"cannot bind port\n") ;return(-1);
 	}
@@ -1436,6 +1590,7 @@ for (int i=0;i<c->current_number_of_polls;i++) {
       }
 
     if (handle_three(c,i, c->local_poll_predo_start_time[c->network1_check_poll_runs_in_call],1)) {
+      clear_errno(c,i);
       continue;
       }     
 
@@ -1443,6 +1598,7 @@ for (int i=0;i<c->current_number_of_polls;i++) {
     c->pollfds[i].revents=0;
   
     }  // our clean up and set  for polling
+  clear_errno(c,i);
   } // for all polls
 
 compute_sendable_recieveables(c,1); 
@@ -1508,7 +1664,7 @@ if (!(number_of_events+number_to_round)) {
 	    c->call_rounds[i]=1;
 	    }
 	  else if (result<0) {
-	    int e=errno;
+	    int e=nerrno(c,i);
 	    if ((e==EAGAIN)||(e==EWOULDBLOCK)) {
 	      c->poll_state[i]=4;
               c->pollfds[i].fd=c->sockets[i];
@@ -1528,8 +1684,7 @@ if (!(number_of_events+number_to_round)) {
       if (c->pollfds[i].revents&(POLLOUT|POLLERR)) {
         e = 0;
 	socklen_t lenn=sizeof(int);
-        getsockopt(c->sockets[i],SOL_SOCKET,SO_ERROR,(void *)&e,&lenn);
-        c->pollfds[i].fd=-1;       
+        e=nerrno(c,i);
         network1_handle_connect_error(c,i,e);
       
 
@@ -1948,8 +2103,8 @@ for (int o=NUMBER_OF_NETWORK1_PARTICIPANTS;o<NUMBER_OF_NETWORK1_PARTICIPANTS_TIM
     struct sockaddr_in inAddr;
     memset ((char *)(& inAddr),0, sizeof(struct sockaddr_in));
     inAddr.sin_family = AF_INET;                 /* Internet address family */
-    inAddr.sin_addr.s_addr = inet_addr(ips[participant_number]); /* all inqddr go to me. address is the output address*/
-//    inAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+//  inAddr.sin_addr.s_addr = inet_addr(ips[participant_number]); /* all inqddr go to me. address is the output address*/
+    inAddr.sin_addr.s_addr = htonl(INADDR_ANY);
     inAddr.sin_port = htons(c->ports[o]);         /* listen to our ip address on the given port */
     c->poll_addresses[o] = inAddr;
     }

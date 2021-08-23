@@ -29,6 +29,7 @@ char stdin_buffer[50000];
 
 
 void stdin_in1(struct network1_complete *c,int i, int n) {
+if (c->poll_state[i]==5) {
 for (int j=0;j<c->buflen[i];j++) {
 
   int ch = c->buffers[i][j];
@@ -49,6 +50,7 @@ for (int j=0;j<c->buflen[i];j++) {
   }
 c->buflen[i]=0;
 c->poll_state[i]=3;
+  }
 }
 
 void stdin_in3(struct network1_complete *c,int i, int n) {
