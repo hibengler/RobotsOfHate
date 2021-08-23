@@ -66,8 +66,8 @@ test4_with_sound:  superpos.o hibfonts.a larry_harvey_has_a_possee.o player.o \
 	       -ldl -lrt -lX11 -lm -DPLATFORM_DESKTOP -pthread
 	       
 
-test5_player: test5_player.o network1.o
-	gccp $(LDFLAGS)  -g -o test5_player test5_player.o network1.o
+test5_player: test5_player.o network1.o 
+	gcc -p $(LDFLAGS)  -g -o test5_player test5_player.o network1.o   -lpthread
 
 
 test4_with_sound.o: test4_with_sound.c superpos.h	

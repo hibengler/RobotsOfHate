@@ -10,11 +10,45 @@
 #include <error.h>
 #include <sys/time.h>
        
+//
+//
+/*
+Here is the ports on a 6 player deal:
+to receive - it is on the first 6 ports in the array of 12
+player	receivfrom	recvport	sendport	
+0	0		5000		5006
+0	1		5001		5018
+0	2		5002		5030
+0	3		5003		5042
+0	4		5004		5054
+0	5		5005		5066
+			^		   ^
+			5000+player*12+rf  |
+					   5006+rf*12+player
+
+This is stored in 6 and above
+id	player	sendto		sendport	recvport
+6	0	0		5006		5000
+7	0	1		5007		5012
+8	0	2		5008		5024
+9	0	3		5009		5036
+10	0	4		5010		5048
+11	0	5		5011		5060
+^				^		^
+|				|		|
+|				|		|
+|				|		|
+|				|		|
+|				|
+6+sendto 			5006+12*(player)+sendto
+						|
+						5000+12*sendto+player
+*/
 
 
 
 
-
+/* bind where we receive from */
 static int network1_setup_and_bind(network1_complete *c, int bind_id) {
 int s = c->sockets[bind_id];
 if (s==-1) {
@@ -38,11 +72,16 @@ if (bind_id > NUMBER_OF_NETWORK1_PARTICIPANTS) {
 if( bind(s , (struct sockaddr*)&(c->poll_addresses[bind_id]), sizeof(struct sockaddr_in) ) == -1)
     {
 //    fprintf(stderr,"error bind socket %d id %d port %d\n",s,bind_id,c->ports[bind_id]);
-    fprintf(stderr,"error bind socket %d id %d\n",s,bind_id);
+  int e=errno;
+    fprintf(stderr,"error bind socket %d id %d err %d\n",s,bind_id,e);
     return(0);
     }
 c->poll_state[bind_id]=1;
+return 1;
 }
+
+
+
 
 
 
@@ -63,13 +102,13 @@ if (tusec > 1000000l) {
   }
 a.tv_sec += asec;
 a.tv_usec = tusec;
-fprintf(stderr,"delay add %d milliseconds to %ld %ld -> %ld %ld\n",millisecondsa,b.tv_sec,b.tv_usec,a.tv_sec,a.tv_usec);
+fprintf(stderr,"	delay add %d milliseconds to %ld %ld -> %ld %ld\n",millisecondsa,b.tv_sec,b.tv_usec,a.tv_sec,a.tv_usec);
 c->local_delay_work[bind_id]=a;
 }
 
 
 
-
+/* this unconnects the bingding by seting the famult to AF_UNSPEC; */
 static int network1_unconnect(network1_complete *c,int bind_id) {
        struct sockaddr_in aaa;
        aaa.sin_family = AF_UNSPEC;
@@ -78,12 +117,14 @@ static int network1_unconnect(network1_complete *c,int bind_id) {
 int e=0;       
    if (connect(c->sockets[bind_id],(struct sockaddr *)&aaa,sizeof(struct sockaddr_in)) ==-1) {
           e=errno;
-          fprintf(stderr,"EINTR clear connectunlink to connect got errno %d\n",e);
+          fprintf(stderr,"	EINTR clear connectunlink to connect got errno %d\n",e);
 	  }
 return e;
 }
 
 
+
+/* move the state to state one generically. */
 static int generic_toone(network1_complete *c, int bind_id,int milliseconds) {
 network1_unconnect(c,bind_id);
 c->poll_state[bind_id]=1;
@@ -281,6 +322,7 @@ static int receive_in_progress(network1_complete *c, int bind_id) {
       c->poll_state[bind_id]=4;
       c->pollfds[bind_id].fd=c->sockets[bind_id];
       c->pollfds[bind_id].events=POLLIN|POLLPRI|POLLERR;
+return 1;
 }
 
 
@@ -511,6 +553,7 @@ return 1;
 
 static int network1_handle_receive_error(network1_complete *c,int bind_id,int e) {
 //int result = recv(c->sockets[bind_id],&(c->buffers[bind_id]),NETWORK1_MAX_BUFFER_SIZE,MSG_DONTWAIT);
+fprintf(stderr,"here we are %d\n",e);
 if (e==0) {  // end of file
   receive_eof(c,bind_id);
   }
@@ -593,9 +636,11 @@ return (0);
 
 
 
-static int network1_attempt_receive(network1_complete *c,int bind_id) {
+static int network1_attempt_receive(network1_complete *c,int bind_id, int polled) {
+fprintf(stderr,"recv hey %d\n",polled);
 c->poll_state[bind_id]=4;  // waiting for read
-int result = recv(c->sockets[bind_id],&(c->buffers[bind_id]),NETWORK1_MAX_BUFFER_SIZE,MSG_DONTWAIT);
+int result = recv(c->sockets[bind_id],c->buffers[bind_id],NETWORK1_MAX_BUFFER_SIZE,9/*MSG_DONTWAIT*/);
+fprintf(stderr," rd %d got out %d of %d from %d to %d\n",bind_id,result,c->buflen[bind_id],c->sent_to_ports[bind_id],c->ports[bind_id]);
 if (result==0) {  // end of file
   receive_eof(c,bind_id);
   }
@@ -609,6 +654,11 @@ else {
     }
   else 	{		    
     if ((e==EAGAIN)||(e==EWOULDBLOCK)||(e==EINPROGRESS)) {
+       if (e==EAGAIN) {fprintf(stderr,"EAGAIN\n");}
+       if (e==EWOULDBLOCK) {fprintf(stderr,"ewouldblock\n");}
+       if (e==EINPROGRESS) {fprintf(stderr,"einprogress\n");}
+     
+fprintf(stderr,"recv ogs result %d e %d  hey\n",result,e);
       receive_in_progress(c,bind_id);
       }   
     else if (e==EBADF) {
@@ -695,6 +745,7 @@ return (0);
 static int network1_handle_send_error(network1_complete *c,int bind_id,int e) {
 //c->poll_state[bind_id]=4;  // waiting for read
 //int result = send(c->sockets[bind_id],&(c->buffers[bind_id][0]),NETWORK1_MAX_BUFFER_SIZE,MSG_DONTWAIT);
+fprintf(stderr,"handle out e is %d\n",e);
 if (e==0) {  // end of file
   send_eof(c,bind_id);
   }
@@ -704,6 +755,7 @@ else {
     }
   else 	{		    
     if ((e==EAGAIN)||(e==EWOULDBLOCK)||(e==EINPROGRESS)) {
+      fprintf(stderr,"we are here\n");
       send_in_progress(c,bind_id);
       }   
     else if (e==EACCES) {
@@ -794,7 +846,9 @@ static int network1_attempt_send(network1_complete *c,int bind_id) {
 fprintf(stderr,"Attempt to send id %d %s\n",bind_id,c->buffers[bind_id]);
 int e=0;
 c->poll_state[bind_id]=4;  // waiting for read
-int result = send(c->sockets[bind_id],&(c->buffers[bind_id][0]),NETWORK1_MAX_BUFFER_SIZE,MSG_DONTWAIT|MSG_CONFIRM);
+int result = send(c->sockets[bind_id],c->buffers[bind_id],c->buflen[bind_id],MSG_DONTWAIT|MSG_CONFIRM);
+fprintf(stderr," sd %d got out %d of %d from %d to %d\n",bind_id,result,c->buflen[bind_id],c->ports[bind_id],c->sent_to_ports[bind_id]);
+
 if (result==0) {  // end of file
   send_eof(c,bind_id);
   }
@@ -814,7 +868,7 @@ else {
       fprintf(stderr,"we are in progress yo\n");
       }   
     else if (e==EACCES) {
-      fprintf(stderr,"   EBADF  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
+      fprintf(stderr,"   EACCES  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
       send_eacces(c,bind_id);
       }
     else if (e==EALREADY) {
@@ -918,11 +972,10 @@ else {
       }
   }
   
-fprintf(stderr,"receive vyfkenb us %d\n",c->buflen[bind_id]);  
   
 if (c->buffers[bind_id]) {
   if (!(c->buflen[bind_id])) {
-    return (network1_attempt_receive(c,bind_id));
+    return (network1_attempt_receive(c,bind_id,0));
     }
   }  	
 return 0;
@@ -1268,6 +1321,23 @@ for (int i=0;i<NUMBER_OF_NETWORK1_PARTICIPANTS;i++) {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 int network1_poll_check(network1_complete *c) {
 
 gettimeofday(&(c->local_check_start_time),NULL);  // used for the offset
@@ -1299,50 +1369,77 @@ network1_reset_sendables_and_stuff(c);
 
 /* clear out revents, and turn off write polls if not necessary. read polls are necessary */
 for (int i=0;i<c->current_number_of_polls;i++) {
-  int communicator =c-> communicator[i];
-  c->pollfds[i].fd=-1; // dont poll as default 
-  if (c->communicator[i]==c->participant_number) {
+  if ((c->type[i]==2)) {
+    if (c->poll_state[i]==3) {
+      if (c->buffers[i]) {
+        if (!c->buflen[i]) {
+          int result=read(c->sockets[i],&(c->buffers[i][0]),2047);
+//	  fprintf(stderr,"read %lx got %d\n",(long)&(c->buffers[i]),result);
+	  if (result>=0) {
+	    c->buflen[i]=result;
+	    c->poll_state[i]=5;
+	    c->call_rounds[i]=1;
+	    }
+	  else if (result<0) {
+	    int e=errno;
+	    if ((e==EAGAIN)||(e==EWOULDBLOCK)) {
+	      c->poll_state[i]=4;
+              c->pollfds[i].fd=c->sockets[i];
+	      }
+	    }
+          } // if there is nothing in the buffer
+        } // if we have a buffer
+      } // if we have a poll state of 3
+    continue;
+    } // if we art type 2
+  else if ((c->type[i]==3)) {
     continue;
     }
+  else {
+    int communicator =c->communicator[i];
+    c->pollfds[i].fd=-1; // dont poll as default 
+    if (c->communicator[i]==c->participant_number) {
+      continue;
+      }
     
-  go_around_timeouts(c,communicator,c->local_poll_predo_start_time[c->network1_check_poll_runs_in_call]);
+    go_around_timeouts(c,communicator,c->local_poll_predo_start_time[c->network1_check_poll_runs_in_call]);
       
-  if (error_continuance(c,i,c->local_poll_predo_start_time[c->network1_check_poll_runs_in_call]))  continue;
+    if (error_continuance(c,i,c->local_poll_predo_start_time[c->network1_check_poll_runs_in_call]))  continue;
 
   
-  if (c->poll_state[i]==0) {
-    network1_setup_and_bind(c,i);
-    }
-  if (c->poll_state[i]==1) {
-    network1_connect_to_outside_poll(c,i);
-    }
-  if (c->poll_state[i]==2) {
-    c->pollfds[i].fd=c->sockets[i]; // we will poll the connection -- if we are done with waiting . might go to 3
-    }
+    if (c->poll_state[i]==0) {
+      network1_setup_and_bind(c,i);
+      }
+    if (c->poll_state[i]==1) {
+      network1_connect_to_outside_poll(c,i);
+      }
+    if (c->poll_state[i]==2) {
+      c->pollfds[i].fd=c->sockets[i]; // we will poll the connection -- if we are done with waiting . might go to 3
+      }
     
     
-  if (c->poll_state[i]==5) {  // this was actioned earlier, and we got past the wait time
+    if (c->poll_state[i]==5) {  // this was actioned earlier, and we got past the wait time
 
 	c->buflen[i]=0;
         c->poll_state[i]=3;
-    }
-  if (c->poll_state[i]>=6) {  // we are keeping the buffer as is - still need to send it
-    c->poll_state[i]=3;
-    }    
+      }
+    if (c->poll_state[i]>=6) {  // we are keeping the buffer as is - still need to send it
+      c->poll_state[i]=3;
+      }    
 
-  if ((c->poll_state[i]==4)) {
-    c->pollfds[i].fd=c->sockets[i];
-    }
+    if ((c->poll_state[i]==4)) {
+      c->pollfds[i].fd=c->sockets[i];
+      }
 
-  if (handle_three(c,i, c->local_poll_predo_start_time[c->network1_check_poll_runs_in_call],1)) {
-    continue;
-    }     
+    if (handle_three(c,i, c->local_poll_predo_start_time[c->network1_check_poll_runs_in_call],1)) {
+      continue;
+      }     
 
-  /* now clean revents */
-  c->pollfds[i].revents=0;
+    /* now clean revents */
+    c->pollfds[i].revents=0;
   
-  }  // our clean up and set  for polling
-
+    }  // our clean up and set  for polling
+  } // for all polls
 
 compute_sendable_recieveables(c,1); 
 process_poll_buffer_statuses(c,0);  
@@ -1351,7 +1448,7 @@ process_poll_buffer_statuses(c,0);
   
   
   
-  gettimeofday(&(c->local_poll_predo_end_time[c->network1_check_poll_runs_in_call]),NULL); 
+gettimeofday(&(c->local_poll_predo_end_time[c->network1_check_poll_runs_in_call]),NULL); 
 
 
 
@@ -1362,7 +1459,7 @@ process_poll_buffer_statuses(c,0);
 
 
 
-
+/* ----------------------- here is the poll command ------------------------ */
 int number_of_events = poll(&(c->pollfds[0]), c->current_number_of_polls,0);		
   
 
@@ -1397,7 +1494,30 @@ if (!(number_of_events+number_to_round)) {
 // and we can use the sendable and recieveable stuff to do less.
 { // Block to handle the polls 
   for (int i=0;i<c->current_number_of_polls;i++) {
-   
+    if ((c->type[i]==2)) {
+      if (c->pollfds[i].revents&(POLLIN|POLLPRI)) {
+          int result=read(c->sockets[i],&(c->buffers[i][0]),2047);
+//	  fprintf(stderr,"read2 %lx got %d\n",(long)&(c->buffers[i]),result);
+	  if (result>0) {
+	    c->buflen[i]=result;
+	    c->poll_state[i]=5;
+	    c->call_rounds[i]=1;
+	    }
+	  else if (result<0) {
+	    int e=errno;
+	    if ((e==EAGAIN)||(e==EWOULDBLOCK)) {
+	      c->poll_state[i]=4;
+              c->pollfds[i].fd=c->sockets[i];
+	      }
+	    }
+          }
+      
+      continue;
+      }
+    else if ((c->type[i]==3)) {
+      continue;
+      }
+       
   
     if (c->poll_state[i]==2) { // doing a connect and waaiting for POLLOUT
       int e=0;
@@ -1415,7 +1535,7 @@ if (!(number_of_events+number_to_round)) {
         } /* if we are ca connect and got a return value  on state 2 */ 
       }  /* if state=2 , connection possibly made */
     else if (c->poll_state[i]==4) { // doing a send or receive 
-      if (i<NUMBER_OF_NETWORK1_PARTICIPANTS) {
+      if (c->type[i]==0) { // if receive
         int e=0;
         if (c->pollfds[i].revents&(POLLERR)) {
           e = 0;
@@ -1425,10 +1545,10 @@ if (!(number_of_events+number_to_round)) {
           network1_handle_receive_error(c,i,e);
           }
         else if (c->pollfds[i].revents&(POLLIN|POLLPRI)) {
-          network1_attempt_receive(c,i);
+          network1_attempt_receive(c,i,1);
 	  }
 	} // if input
-      else { //  (i>=NUMBER_OF_NETWORK1_PARTICIPANTS)  , output
+      else if (c->type[i]==1) { //  send
         int e=0;
         if (c->pollfds[i].revents&(POLLERR)) {
           e = 0;
@@ -1438,16 +1558,16 @@ if (!(number_of_events+number_to_round)) {
           network1_handle_send_error(c,i,e);
           }
         else if (c->pollfds[i].revents&POLLOUT) {
+	  fprintf(stderr,"gsyfiqwgydsqjh bhlghgbhjlhjl\n");
 	  network1_attempt_send(c,i);
 fprintf(stderr,"githtotr5r\n");
-//          send_gotit(c,i);
+          send_gotit(c,i);
 //        c->call_rounds[bind_id]=1;
 //	  c->poll_state[bind_id]=5;
 	  }
 	} // if output
 	
       } // if state is 4
-    i = i + 1;
     } // while going through all events
   }     /* special block to handle connect polling */
   
@@ -1606,6 +1726,8 @@ network1_reset_sendables_and_stuff(c);
   
 /* Extra read all about it -- postdo  */
 for (int i=0;i<c->current_number_of_polls;i++) {
+  if (c->type[i]==2) {continue;}
+  if (c->type[i]==3) {continue;}
   int communicator = c->communicator[i];
   
   /* since we are not looping right now, start a send or receive for any type 3's */
@@ -1671,8 +1793,41 @@ return number_to_round;
 
 
 
+/* call after network1_init to add a file or non udp socket port */
+int network1_add_standard_input_fd(network1_complete *c,int fd,  
+     network1_complete_round_call network1_handle_action_round1_in,  
+     network1_complete_round_call network1_handle_action_round2_in,
+     network1_complete_round_call network1_handle_action_round3_in,   
+     network1_complete_round_call network1_get_new_receive_buffer) {
+int i=  c->current_number_of_polls;
+c->call_rounds[i]=0;
+c->buflen[i]=0;
+c->change_buffer_flag[i] = 0;
+c->type[i] = 2;                         // read file
 
+gettimeofday(&(c->local_delay_work[i]),NULL);
+c->broadcast_permission[0]=0;
 
+c->poll_state[i] = 3;
+c->communicator[i]=-1;
+c->direction[i]=0;
+c->ports[i]=0;
+memset(&(c->sending_to[i]),0,sizeof(struct sockaddr_in));
+c->sent_to_ports[i]=0;
+memset(&(c->poll_addresses[i]),0,sizeof(struct sockaddr_in));
+
+c->sockets[i]=fd;
+c->pollfds[i]=(struct pollfd){fd:-1,events:POLLIN|POLLPRI|POLLERR,revents:0};
+c->network1_handle_action_round1[i] = network1_handle_action_round1_in;
+c->network1_handle_action_round2[i] = network1_handle_action_round2_in;
+c->network1_handle_action_round3[i] = network1_handle_action_round3_in;
+c->network1_get_new_receive_buffer[i] = network1_get_new_receive_buffer;
+c->network1_get_new_send_buffer[i] = NULL;
+c->network1_pull_next_send_buffer_from_queue[i] = NULL;
+
+c->current_number_of_polls++;
+return i;
+}
 
 
 
@@ -1711,8 +1866,11 @@ c->participant_number = participant_number;
 struct timeval nowtime;
 gettimeofday(&nowtime,NULL);
 
+/* set up input ports */
 for (int i=0;i<NUMBER_OF_NETWORK1_PARTICIPANTS;i++) {
   int communicator = i;
+  c->change_buffer_flag[i] = 0;
+  c->type[i] = 0; // read from sender
   c->poll_state[i] = 0;
   c->communicator[i] = i;
   c->direction[i] = 1;  // will have to do that later
@@ -1727,20 +1885,29 @@ for (int i=0;i<NUMBER_OF_NETWORK1_PARTICIPANTS;i++) {
     struct sockaddr_in inAddr;
     memset ((char *)(& inAddr),0, sizeof(struct sockaddr_in));
     inAddr.sin_family = AF_INET;                 /* Internet address family */
+    fprintf(stderr,"listen %s\n",ips[participant_number]);
     inAddr.sin_addr.s_addr = inet_addr(ips[participant_number]); /* all inqddr go to me. address is the output address*/
-//  inAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    fprintf(stderr,"got %d port %d\n",inAddr.sin_addr.s_addr,c->ports[i]);
+//  inAddr.sin_addr.s_addr = htonl(INADDR_ANY);  -- more indiscriminate
     inAddr.sin_port = htons(c->ports[i]);         /* listen to our ip address on the given port */
     c->poll_addresses[i] = inAddr;
     }
 
-  c->sent_to_ports[communicator] =  NETWORK1_START_PORT + communicator * NUMBER_OF_NETWORK1_PARTICIPANTS_TIMES_2  +  NUMBER_OF_NETWORK1_PARTICIPANTS +  c->participant_number; // this is the port we send to from the sender to us receiver
+  /* also set the ports we are going to send to */
 
+
+  int send_id=communicator+NUMBER_OF_NETWORK1_PARTICIPANTS;
+    
+  c->sent_to_ports[communicator] = NETWORK1_START_PORT + NUMBER_OF_NETWORK1_PARTICIPANTS + communicator * NUMBER_OF_NETWORK1_PARTICIPANTS_TIMES_2  +  c->participant_number; // this is the port we send to from the sender to us receiver
+  // this is the port it should come from
+  
+  
   {
     struct sockaddr_in sendToAddr;
     memset ((char *)(& sendToAddr),0, sizeof(struct sockaddr_in));
     sendToAddr.sin_family = AF_INET;                 /* Internet address family */
-    sendToAddr.sin_addr.s_addr = inet_addr(ips[communicator]); /* all inqddr go to me. address is the output address*/
-//  sendToAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    sendToAddr.sin_addr.s_addr = inet_addr(ips[communicator]); /* we set to the device */
+    sendToAddr.sin_addr.s_addr = htonl(INADDR_ANY); // linux does not listen on ip, but it will listen on a device - aaah 
     sendToAddr.sin_port = htons(c->sent_to_ports[communicator]);         /* listen to our ip address on the given port */
     c->sending_to[i] = sendToAddr;  /* we filter to see if it is from the same thing */
     }
@@ -1760,12 +1927,12 @@ for (int i=0;i<NUMBER_OF_NETWORK1_PARTICIPANTS;i++) {
   }
 
 
-
-
 for (int o=NUMBER_OF_NETWORK1_PARTICIPANTS;o<NUMBER_OF_NETWORK1_PARTICIPANTS_TIMES_2;o++) {
   int communicator = o-NUMBER_OF_NETWORK1_PARTICIPANTS;
+  c->change_buffer_flag[o] = 0;
+  c->type[o] = 1; // read from sender
   c->poll_state[o] = 0;
-  c->communicator[o] = communicator;
+  c->communicator[o] = communicator;  // where we send from
   c->direction[o] = 1;  // will have to do that later
   c->ports[o] = NETWORK1_START_PORT + NUMBER_OF_NETWORK1_PARTICIPANTS + c->participant_number * NUMBER_OF_NETWORK1_PARTICIPANTS_TIMES_2  + communicator;
   c->sockets[o]=-1;
@@ -1778,7 +1945,7 @@ for (int o=NUMBER_OF_NETWORK1_PARTICIPANTS;o<NUMBER_OF_NETWORK1_PARTICIPANTS_TIM
     memset ((char *)(& inAddr),0, sizeof(struct sockaddr_in));
     inAddr.sin_family = AF_INET;                 /* Internet address family */
     inAddr.sin_addr.s_addr = inet_addr(ips[participant_number]); /* all inqddr go to me. address is the output address*/
-  //inAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+//    inAddr.sin_addr.s_addr = htonl(INADDR_ANY);
     inAddr.sin_port = htons(c->ports[o]);         /* listen to our ip address on the given port */
     c->poll_addresses[o] = inAddr;
     }
@@ -1786,12 +1953,12 @@ for (int o=NUMBER_OF_NETWORK1_PARTICIPANTS;o<NUMBER_OF_NETWORK1_PARTICIPANTS_TIM
   c->local_delay_work[o] = nowtime;
 
   c->sent_to_ports[o] =   NETWORK1_START_PORT + communicator * NUMBER_OF_NETWORK1_PARTICIPANTS_TIMES_2  +  c->participant_number;  /* this is what we semd tp from us to a receiver*/ 
-  {
+  {//
     struct sockaddr_in sendToAddr;
     memset ((char *)(& sendToAddr),0, sizeof(struct sockaddr_in));
     sendToAddr.sin_family = AF_INET;                 /* Internet address family */
     sendToAddr.sin_addr.s_addr = inet_addr(ips[communicator]); /* all inqddr go to me. address is the output address*/
-//  sendToAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+//    sendToAddr.sin_addr.s_addr = htonl(INADDR_ANY);
     sendToAddr.sin_port = htons(c->sent_to_ports[o]);         /* listen to our ip address on the given port */
     c->sending_to[o] = sendToAddr;                      
     }   
@@ -1835,4 +2002,4 @@ return 1;
 
 /* end of network1,c */
 
-																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																														      																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																									
+																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																														      																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																														

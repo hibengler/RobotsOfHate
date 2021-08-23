@@ -28,7 +28,7 @@
 
 #define NUMBER_OF_NETWORK1_PARTICIPANTS 6
 #define NUMBER_OF_NETWORK1_PARTICIPANTS_TIMES_2 12
-#define NETWORK1_START_PORT 5169
+#define NETWORK1_START_PORT 5000
 #define MAX_NUMBER_OF_POLLS 50
 #define NETWORK1_POLL_CHECK_MAX_POLL_CALLS 10
 #define NETWORK1_MAX_BUFFER_SIZE 2048
@@ -119,7 +119,8 @@ networjk_attempt_send needs it full
   char *buffers[MAX_NUMBER_OF_POLLS];
 
 
-
+  int change_buffer_flag[MAX_NUMBER_OF_POLLS]; // true if the buffer is being changed by out calls, false otherwise
+  int type[MAX_NUMBER_OF_POLLS]; // 0 - read from sender, 1 - send to receiver, 2 - read from standard file, 3 - write from standard file
   struct timeval local_delay_work[MAX_NUMBER_OF_POLLS];  // wait until this time is passed
   
   
@@ -236,6 +237,12 @@ extern int network1_set_buffer(network1_complete *c,int bind_id,char *buffer, in
 
 
           
+extern int network1_add_standard_input_fd(network1_complete *c,int fd,
+     network1_complete_round_call network1_handle_action_round1_in,
+     network1_complete_round_call network1_handle_action_round2_in,
+     network1_complete_round_call network1_handle_action_round3_in,
+     network1_complete_round_call network1_get_new_receive_buffer);
+
 int rehearse_network(network1_complete *c);  /* find the other ones */
 
 #endif

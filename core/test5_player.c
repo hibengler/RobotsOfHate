@@ -3,7 +3,7 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <time.h>
-
+#include <fcntl.h>
 #include "network1.h"
 
 
@@ -20,42 +20,43 @@ char received_buffers[6][50000];
 int running=1;
 int to_player=0;
 
-volatile int lock_ch1=0;
-volatile int lock_ch2=0;
-volatile int lock_ch3=0;
-volatile int ch= EOF;
+char stdin_buffer[50000];
 
 
-void * readchars(void *x) {
-while (running) {
-  lock_ch2=1;
-  while (lock_ch1) {}
 
 
-       
 
 
-  ch=EOF;
-  ch=getchar();
-  lock_ch2=0;
-  while (lock_ch3) {}
 
+void stdin_in1(struct network1_complete *c,int i, int n) {
+for (int j=0;j<c->buflen[i];j++) {
+
+  int ch = c->buffers[i][j];
+  fprintf(stderr,"%c\n",ch);
+  if ((ch==0) ||(ch == EOF)) {}
+  else if (ch==3) running=0;
+  else if ((ch>='0')&&(ch<'6')) {
+    if ((ch-'0') != c->participant_number) {
+      to_player=ch-'0';
+      }
+    }
+  else {
+    char s[4];
+    s[0]=ch;
+    s[1]='\0';
+    strcat(pending_send[to_player],s);
+    } 
   }
+c->buflen[i]=0;
+c->poll_state[i]=3;
+}
+
+void stdin_in3(struct network1_complete *c,int i, int n) {
 }
 
 
 
-
-
-
-
-
-
-
-
-
 void do_in1(struct network1_complete *c,int i, int n) {
-fprintf(stderr,"calling do_in1  poll state is %d\r\n",c->poll_state[i]);
 int communicator = c->communicator[i];
 if (c->poll_state[i]>=6) {
   fprintf(stderr,"xxx");
@@ -69,7 +70,6 @@ else if (c->poll_state[i]==5) {
   c->buflen[i]=0;
   c->poll_state[i]=3;
   }
-fprintf(stderr,"r");  
 }
 
 
@@ -79,8 +79,11 @@ fprintf(stderr,"r");
 
 
 
+
+
+
+
 void do_out1(struct network1_complete *c,int i, int n) { 
-fprintf(stderr,"calling do_out1  poll state is %d\r\n",c->poll_state[i]);
 if (c->poll_state[i]>=6) {
   fprintf(stderr,"xxx1");
 }
@@ -124,13 +127,13 @@ sprintf(s,"%4ld",am);
 int output_screen(network1_complete *c,int result) {
 
 //fprintf(stdout,"%c[2J%c[1;1HPlayer %d\r\nrecv  sent\r\nstatus              Conversation\r\n",(char)27,(char)27,c->participant_number);
-fprintf(stdout,"%c[2J%c[1;1HPlayer %d\r\nrecv  sent\r\nstatus              Conversation\r\n",(char)32,(char)32,c->participant_number);
+fprintf(stdout,"%c[2J%c[1;1HPlayer %d\r\nrecv  sent\r\nstatus              Conversation\r\n",(char)27,(char)27,c->participant_number);
 for (int i=0;i<12;i++) {
   fprintf(stdout,"%d",c->poll_state[i]);
   }
 
 
-fprintf(stdout,"   ressult %d\r\n",result);
+fprintf(stdout,"   result %d\r\n",result);
 for (int i=0;i<12;i++) {
   fprintf(stdout,"%4d 	",c->ports[i]);
   }
@@ -139,11 +142,14 @@ for (int i=0;i<12;i++) {
   fprintf(stdout,"%4d 	",c->sent_to_ports[i]);
   }
 
+fprintf(stdout,"\r\n");
 
 for (int i=0;i<6;i++) {
+  char *me;
+  if (to_player==i) me="-->"; else me = "";
   fprintf(stdout,"	from	%d %s\r\n",i,received_buffers[i]);
-  fprintf(stdout,"        to 	%d %s\r\n",i,sent_buffers[i]);
-  fprintf(stdout,"	 you 	%d %s\r\n\r\n",i,convo_buffers[i]);
+  fprintf(stdout,"	  to 	%d %s\r\n",i,sent_buffers[i]);
+  fprintf(stdout,"%s	 you 	%d %s\r\n\r\n",me,i,convo_buffers[i]);
   }
 {
   char ds[30];
@@ -178,6 +184,7 @@ void usage() {
   fprintf(stderr," Usage: %s ip0 ip1 ip2 ip3 ip4 ip5 player_id\r\n","test5_player");
   }
 
+
 int main(int argc,char *argv[]) {
 system("stty raw -echo");
 
@@ -194,6 +201,11 @@ network1_init(c,participant_number,"255.255.255.255",&(argv[1]),
    NULL,NULL,NULL,NULL,
    NULL,&(do_in3),&(do_out3),NULL,
     NULL,NULL,NULL);
+
+
+int r=fcntl(fileno(stdin),F_SETFL,O_NONBLOCK);
+fprintf(stderr,"fcntl r is %d\n",r);
+int stdin_port = network1_add_standard_input_fd(c,fileno(stdin),&(stdin_in1),NULL,&(stdin_in3),NULL);
 /*
    &get_receive_buffer,
    &get_new_send_buffer,
@@ -215,64 +227,37 @@ for (int i=0;i<6;i++) {
 //  network1_set_buffer(c,i+6,send_buffers[i],0);
   }          
 
-pthread_t yy;
-pthread_create(&yy,NULL,readchars,NULL);
+stdin_buffer[0]='\0';
+c->buffers[stdin_port] = stdin_buffer;
+c->buflen[stdin_port] = 0;
+
       
 to_player = (participant_number+1)%6;
 while (running) {
-  lock_ch1=1;
-  lock_ch3=0;
-  if (!lock_ch2) {
-    if((ch==0) ||(ch == EOF)) {}
-    else if (ch==3) running=0;
-    else if ((ch>'0')&&(ch<'6')) {
-      if ((ch-'0') != participant_number) {
-        to_player=ch-'0';
-        }
-      }
-    else {
-      char s[4];
-      s[0]=ch;
-      s[1]='\0';
-      fprintf(stderr, " hey %c\r\n",ch);
-      strcat(pending_send[to_player],s);
-      
-      fprintf(stderr, " We got %s\r\n",pending_send[to_player]);
-      }
-    
-    
-    ch = EOF;
-    lock_ch1 = 0;        
-    fprintf(stderr,"%d %d %d %lx %d\n",to_player,c->poll_state[6+to_player],c->send_buffer_ready[to_player],(long)(c->buffers[to_player+6]),c->buflen[to_player+6]);
+    fprintf(stderr,"polling for player %d %d  state %dn\n",to_player,c->poll_state[6+to_player],c->send_buffer_ready[to_player]);
     if ( (c->poll_state[6+to_player] <=3)&& (c->send_buffer_ready[to_player]))  {
-      
        int l=strlen(pending_send[to_player]);
-
        if (l) {
-          fprintf(stderr, " We trnasfer  to %d %s\r\n",to_player,pending_send[to_player]);
-          strcat(convo_buffers[to_player],pending_send[to_player]);
-          if (strlen(convo_buffers[to_player])>60) {
-            strcpy(convo_buffers[to_player], convo_buffers[to_player] +strlen(convo_buffers[to_player])-60);
-            }
-          if (c->poll_state[6+to_player] ==5) {
+         strcat(convo_buffers[to_player],pending_send[to_player]);
+         if (strlen(convo_buffers[to_player])>60) {
+           strcpy(convo_buffers[to_player], convo_buffers[to_player] +strlen(convo_buffers[to_player])-60);
+           }
+         if (c->poll_state[6+to_player] ==5) {
 	    c->poll_state[6+to_player]=3;
 	    c->buflen[6+to_player]=0;
 	    }
-	  
-
-          strcat(c->buffers[6+to_player],pending_send[to_player]);
-	  c->buflen[6+to_player] +=l;
+         strcat(c->buffers[6+to_player],pending_send[to_player]);
+	 c->buflen[6+to_player] +=l;
 	
-	  pending_send[to_player][0]='\0';
-	  fprintf(stderr, "we are staged for %d  %s %d\r\n",6+to_player,send_buffers[to_player],c->poll_state[to_player+6]);
-	  fprintf(stderr," b1 %lx b2 %lx len %d\n",(long)send_buffers[to_player],(long)(c->buffers[6+to_player]),c->buflen[6+to_player]);
-	  }
+	 pending_send[to_player][0]='\0';
+	 }
        } // if we can send
-    }
-
-  lock_ch3=1;
+    
+  fprintf(stderr,"poll check\n");
   int result =  network1_poll_check(c);
-  output_screen(c,result);
+  fprintf(stderr,"poll checked %d\n",result);
+//  if (result) {
+    output_screen(c,result);
        {
         struct timespec thislong;
              thislong.tv_sec = 0;
@@ -280,7 +265,7 @@ while (running) {
 
              nanosleep(&thislong, &thislong);
       }
-  
+//    }
 
   }
 
