@@ -48,8 +48,8 @@ typedef struct network1_complete {
 
   char ip_addresses_string[NUMBER_OF_NETWORK1_PARTICIPANTS][20];
 			     
-  int receiving_poll[NUMBER_OF_NETWORK1_PARTICIPANTS];  // redundant // !*
-  int sending_poll[NUMBER_OF_NETWORK1_PARTICIPANTS];    // redundant // !*
+  pthread_t receiving_thread[NUMBER_OF_NETWORK1_PARTICIPANTS];  // redundant // !*
+  pthread_t sending_thread[NUMBER_OF_NETWORK1_PARTICIPANTS];    // redundant // !*
   
   int sendable[NUMBER_OF_NETWORK1_PARTICIPANTS];  // makes it easier to know id sendable or receiveable
   int recieveable[NUMBER_OF_NETWORK1_PARTICIPANTS];  // makes it easier to know is receiveable
@@ -105,15 +105,9 @@ networjk_attempt_send needs it full
     */
 
       
-   
-  
-  
-  
-  
-  
+
 
   
-  int call_rounds[MAX_NUMBER_OF_POLLS];  
         
   int buflen[MAX_NUMBER_OF_POLLS];
   char *buffers[MAX_NUMBER_OF_POLLS];
@@ -121,26 +115,6 @@ networjk_attempt_send needs it full
 
   int change_buffer_flag[MAX_NUMBER_OF_POLLS]; // true if the buffer is being changed by out calls, false otherwise
   int type[MAX_NUMBER_OF_POLLS]; // 0 - read from sender, 1 - send to receiver, 2 - read from standard file, 3 - write from standard file
-  struct timeval local_delay_work[MAX_NUMBER_OF_POLLS];  // wait until this time is passed
-  
-  
-  struct timeval local_check_start_time;  // time when poll_ckeck start time first called
-  
-  int network1_check_poll_runs_in_call; // 0 to  NETWORK1_POLL_CHECK_MAX_POLL_CALLS
-  struct timeval local_poll_predo_start_time[NETWORK1_POLL_CHECK_MAX_POLL_CALLS];  // time poll check was last called
-  struct timeval local_poll_predo_end_time[NETWORK1_POLL_CHECK_MAX_POLL_CALLS];  // time poll was last called
-  
-  struct timeval local_poll_end_time[NETWORK1_POLL_CHECK_MAX_POLL_CALLS];  // time poll was last ended  struct timeval local_round1_end_time; // later time after round 1
-  
-  struct timeval local_handle_end_time[NETWORK1_POLL_CHECK_MAX_POLL_CALLS]; // time after round 1
-  struct timeval local_round1_end_time[NETWORK1_POLL_CHECK_MAX_POLL_CALLS]; // time after round 1
-  struct timeval local_round2_end_time[NETWORK1_POLL_CHECK_MAX_POLL_CALLS]; // time after round 2
-  struct timeval local_round3_end_time[NETWORK1_POLL_CHECK_MAX_POLL_CALLS]; // time after round 3
-  struct timeval local_postdo_end_time[NETWORK1_POLL_CHECK_MAX_POLL_CALLS]; // time after round 3
-  
-  struct timeval local_network1_check_end_time;  // time after the entire call
-  
-  int broadcast_permission[MAX_NUMBER_OF_POLLS];
       
   int poll_state[MAX_NUMBER_OF_POLLS]; // 0 - not set up 1 - set up and bound , 2 -> waiting for connect or listen, 3 -> connect or listen, 4-> try to read or send 
        // 5 ->  5 will clear out new send buffer if it is full after the rounds, then sets to 3 and gets a new address
@@ -156,7 +130,6 @@ networjk_attempt_send needs it full
                                        // so if we call set_send_outout or something like that, the calling stuff will force 3 to 5, ohterwise 5 will clear.  This allows multiple sends, well at least 2
                                        
   int communicator[MAX_NUMBER_OF_POLLS]; /* player number this is from, or the monitor */ // !*
-  int direction[MAX_NUMBER_OF_POLLS];  //  computed to see what the dircetion is for receiving --- then we swap it for output  // *-
   int ports[MAX_NUMBER_OF_POLLS]; // yes, this is stored here, and also in poll_addresses 
   
   struct sockaddr_in sending_to[MAX_NUMBER_OF_POLLS];

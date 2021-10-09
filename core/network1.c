@@ -175,7 +175,6 @@ int s = c->sockets[bind_id];
 if (s==-1) {
   fprintf(stderr,"new socket id %d\n",bind_id);
   int e = errno;
-//  if ((s=socket(AF_INET, SOCK_DGRAM|SOCK_NONBLOCK, IPPROTO_UDP)) == -1) {
   if ((s=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
     e = errno;
     fprintf(stderr,"no socket available error %d\n",e);
@@ -191,20 +190,23 @@ if (s==-1) {
       }
     }
   }
-c->broadcast_permission[bind_id] = 0;
-
-if (bind_id > NUMBER_OF_NETWORK1_PARTICIPANTS) {
-  /* for ipv6 is IP_MULTICAST_TTL  and other stuff */
-  if (setsockopt(s, SOL_SOCKET,SO_BROADCAST, (void *) &( c->broadcast_permission[bind_id]),
-          sizeof(int)) < 0) { 
-     fprintf(stderr,"bd cannot set permission: on poll %d port %d\n",bind_id,c->ports[bind_id]);
-     return 0;
-     }
+if (bind_id>NUMBER_OF_NETWORK1_PARTICIPANTS) {
+  fprintf(stderr,"why on sending bind id? %d \n",bind_id);
+  return(0);
   }
+  // no need to bind sender
+  struct sockaddr * sa = &(c->poll_addresses[bind_id]);
+        memset(sa, 0, sizeof(servaddr));	
+        sa->sin_family = AF_INET; // IPv4
+        sa->sin_addr.s_addr = inet_addr(servip);
+	sa->sin_port = htons(PORT);
+  
+
+
 clear_errno(c,bind_id);  
 if( bind(s , (struct sockaddr*)&(c->poll_addresses[bind_id]), sizeof(struct sockaddr_in) ) == -1)
     {
-//    fprintf(stderr,"error bind socket %d id %d port %d\n",s,bind_id,c->ports[bind_id]);
+    fprintf(stderr,"error bind1 socket %d id %d port %d\n",s,bind_id,c->ports[bind_id]);
     int e=nerrnoi(c,bind_id);
     if (e!=11) {
       fprintf(stderr,"error bind socket %d id %d err %d\n",s,bind_id,e);
@@ -213,7 +215,7 @@ if( bind(s , (struct sockaddr*)&(c->poll_addresses[bind_id]), sizeof(struct sock
     }
    else 
    {
-//    fprintf(stderr,"error bind socket %d id %d port %d\n",s,bind_id,c->ports[bind_id]);
+    fprintf(stderr,"error2 bind socket %d id %d port %d\n",s,bind_id,c->ports[bind_id]);
     int e=nerrnoi(c,bind_id);
     if (e) {
       if (e!=11) {
@@ -251,7 +253,10 @@ if (tusec > 1000000l) {
 a.tv_sec += asec;
 a.tv_usec = tusec;
 fprintf(stderr,"	delay add %d milliseconds to %ld %ld -> %ld %ld\n",millisecondsa,b.tv_sec,b.tv_usec,a.tv_sec,a.tv_usec);
-c->local_delay_work[bind_id]=a;
+struct timespec ts;
+ts.time_t = tv_sec;
+ts.tv_nsec = tv.usec*1000l;
+nanosleep(&ts.NULL);
 }
 
 
@@ -450,7 +455,7 @@ else {
   }
   
 if (c->type[bind_id]==1) {
-   int result = recv(c->sockets[bind_id],c->buffers[bind_id],NETWORK1_MAX_BUFFER_SIZE,MSG_OOB|MSG_NOSIGNAL|MSG_DONTWAIT);
+   int result = recv(c->sockets[bind_id],c->buffers[bind_id],NETWORK1_MAX_BUFFER_SIZE,MSG_WAITALL);
    int e=nerrno(c,bind_id); 
    fprintf(stderr,"did a listen thing id %d result %d \n",bind_id,result);
    }
@@ -804,7 +809,7 @@ fprintf(stderr,"recv hey %d\n",polled);
 clear_errno(c,bind_id);
 c->poll_state[bind_id]=4;  // waiting for read
 // MSG_DONTROUTE = later
-int result = recv(c->sockets[bind_id],c->buffers[bind_id],NETWORK1_MAX_BUFFER_SIZE,MSG_OOB|MSG_NOSIGNAL|MSG_DONTWAIT);
+int result = recv(c->sockets[bind_id],c->buffers[bind_id],NETWORK1_MAX_BUFFER_SIZE,MSG_WAITIALL);
 //9/*MSG_DONTWAIT*/);
 fprintf(stderr," rd %d got out %d of %d from %d to %d\n",bind_id,result,c->buflen[bind_id],c->sent_to_ports[bind_id],c->ports[bind_id]);
 if (result==0) {  // end of file
@@ -1011,31 +1016,7 @@ return (0);
 
 static int network1_attempt_send(network1_complete *c,int bind_id) {
 int e=0;
- e=errno; 
- int e2= nerrnoi(c,bind_id);
-fprintf(stderr,"Attempt to send id %d %s initial e1 %d e2 %d\n",bind_id,c->buffers[bind_id],e,e2);
-e=0; 
-//c->poll_state[bind_id]=4;  // waiting for read
-{
-int sd;
- unsigned char ip[300];
-  inet_ntop (AF_INET, &c->poll_addresses[bind_id].sin_addr, ip,300);
- int port = htons (c->poll_addresses[bind_id].sin_port);
-  fprintf (stderr,"	from %s:%d	", ip, port);
-  }
-{
-int sd;
- unsigned char ip[300];
-  inet_ntop (AF_INET, &c->sending_to[bind_id].sin_addr, ip,300);
- int port = htons (c->sending_to[bind_id].sin_port);
-  fprintf (stderr,"to %s:%d\n", ip, port);
-  }
-
-//int result = send(c->sockets[bind_id],c->buffers[bind_id],c->buflen[bind_id],MSG_CONFIRM|MSG_NOSIGNAL);
-int result = send(c->sockets[bind_id],c->buffers[bind_id],c->buflen[bind_id],MSG_CONFIRM|MSG_NOSIGNAL|MSG_DONTWAIT);
-//int result = send(c->sockets[bind_id],c->buffers[bind_id],c->buflen[bind_id],MSG_CONFIRM|MSG_NOSIGNAL);
-//int result = sendto(c->sockets[bind_id],&(c->buffers[bind_id][0]),c->buflen[bind_id],MSG_DONTWAIT|MSG_CONFIRM|MSG_NOSIGNAL,(struct sockaddr *)&(c->sending_to[bind_id]),sizeof(struct sockaddr_in));
-//int result = sendto(c->sockets[bind_id],&(c->buffers[bind_id][0]),c->buflen[bind_id],MSG_CONFIRM,(struct sockaddr *)&(c->sending_to[bind_id]),sizeof(struct sockaddr_in));
+int result = send(c->sockets[bind_id],c->buffers[bind_id],c->buflen[bind_id],MSG_CONFIRM);
 fprintf(stderr," sd %d got out %d of %d from %d to %d\n",bind_id,result,c->buflen[bind_id],c->ports[bind_id],c->sent_to_ports[bind_id]);
 
 if (result==0) {  // end of file
@@ -1044,10 +1025,9 @@ if (result==0) {  // end of file
 else if (result >0) {
   e= nerrno(c,bind_id);
   if ((e==EAGAIN)||(e==EWOULDBLOCK)||(e==EINPROGRESS)) {
- //   fprintf(stderr,"would wait on it\n");
+    fprintf(stderr,"would wait on it\n");
     fprintf(stderr,"gotit2\n");
     send_gotit(c,bind_id);
-//    send_in_progress(c,bind_id);
     }
   else if (e==0) {	  
     fprintf(stderr,"gotit1\n");
@@ -1299,50 +1279,13 @@ if (c->communicator[i]==c->participant_number) {
   return 1;
   }
 int communicator = c->communicator[i];
-if (error_continuance(c,i,thedate)) return(1);
 if (c->poll_state[i]==3) {
-  if (!first_time) {    
-    if (c->call_rounds[i])    {return 1;} // dont do it
-    }   
-  if (i<NUMBER_OF_NETWORK1_PARTICIPANTS) {
-//    if (c->network1_get_new_receive_buffer[i]) {
       network1_set_buffer_if_necessary_and_receive_from_poll(c,i);
-//      }
     }
   else if (i<NUMBER_OF_NETWORK1_PARTICIPANTS_TIMES_2) {
- //   if ((c->network1_get_new_send_buffer[i])||(c->network1_pull_next_send_buffer_from_queue[i])) {
       network1_send_if_can(c,i);
- //     }
     }
   // now we ran, if there is no buffer, but I thinkg its still sendable
-      
-  if (c->poll_state[i]==5) { // we are good.
-    c->call_rounds[i]=1;    
-    }
-  else if (c->poll_state[i]>=6) {  /* oh no- 6 needs to go to 7, etc */
-    c->call_rounds[i]=1;    // to see if it is good or bad - we might default it to 3
-    }
-    
-  if ((c->poll_state[i]==4)) {
-    fprintf(stderr,"hey 44444444\n");
-    c->pollfds[i].fd=c->sockets[i];
-    }
-      
-  if((c->poll_state[i]<3)||(c->poll_state[i]>4)) {
-    if (c->poll_state[i] > 4) {
-      c->call_rounds[i]=1; // call without even setting up the poll
-      }  
-    }	 // if state 3 moves - make sure we call the triggers  
-      	
-  if (error_continuance(c,i,thedate)) return(1);
-
-  if ((c->poll_state[i]==2)||(c->poll_state[i]==4)) {
-    c->pollfds[i].fd=c->sockets[i];
-    }
-  else {
-    c->pollfds[i].fd=-1; // dont poll 
-    }   
-  }
 return(0);     
 }
 
@@ -1542,10 +1485,6 @@ for (int i=0;i<NUMBER_OF_NETWORK1_PARTICIPANTS;i++) {
 
 
 int network1_poll_check(network1_complete *c) {
-
-gettimeofday(&(c->local_check_start_time),NULL);  // used for the offset
-
-c->network1_check_poll_runs_in_call = 0;
 
 
 
@@ -1995,15 +1934,6 @@ gettimeofday(&(c->local_network1_check_end_time),NULL);
   
   char dse[30];
   
-  format_difference_date(dse,c->local_check_start_time,c->local_network1_check_end_time);
-  format_difference_date(ds,c->local_check_start_time,c->local_poll_predo_start_time[0]);
-  format_difference_date(dpr,c->local_poll_predo_start_time[0],c->local_poll_predo_end_time[0]);
-  format_difference_date(dpl,c->local_poll_predo_end_time[0],c->local_poll_end_time[0]);
-  format_difference_date(dh,c->local_poll_end_time[0],c->local_handle_end_time[0]);
-  format_difference_date(d1,c->local_handle_end_time[0],c->local_round1_end_time[0]);
-  format_difference_date(d2,c->local_round1_end_time[0],c->local_round2_end_time[0]);
-  format_difference_date(d3,c->local_round2_end_time[0],c->local_round3_end_time[0]);
-  format_difference_date(dps,c->local_round3_end_time[0],c->local_postdo_end_time[0]);
 //  fprintf(stderr,"\n\n	Date %s 	= pre %s	pl %s	ph %s		r1 %s r2 %s	r3 %s ps %s\n",dse,dpr,dpl,dh,d1,d2,d3,dps);
   }
 
