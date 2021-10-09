@@ -13,37 +13,74 @@
 //
 //
 /*
-Here is the ports on a 6 player deal:
-to receive - it is on the first 6 ports in the array of 12
 player	receivfrom	recvport	sendport	
-0	0		5000		5006
-0	1		5001		5018
-0	2		5002		5030
-0	3		5003		5042
-0	4		5004		5054
-0	5		5005		5066
+0	0		7000		7036
+0	1		7001		7042
+0	2		7002		7048
+0	3		7003		7054
+0	4		7004		7060
+0	5		7005		7066
+1	0		7006		7037
+1	1		7007		7043
+1	2		7008		7049
+1	3		7009		7055
+1	4		7010		7061
+1	5		7011		7067
+2	0		7012		7038
+2	1		7013		7044
+2	2		7014		7050
+2	3		7015		7056
+2	4		7016		7062
+2	5		7017		7068
+3	0		7018		7039
+3	1		7019		7045
+3	2		7020		7051
+3	3		7021		7057
+3	4		7022		7063
+3	5		7023		7069
+4	0		7024		7040
+4	1		7025		7046
+4	2		7026		7052
+4	3		7027		7058
+4	4		7028		7064
+4	5		7029		7070
+5	0		7030		7041
+5	1		7031		7047
+5	2		7032		7053
+5	3		7033		7059
+5	4		7034		7065
+5	5		7035		7071
+		
 			^		   ^
-			5000+player*12+rf  |
-					   5006+rf*12+player
+			7000+player*6+rf  |
+					   7036+rf*6+player
+					   
 
 This is stored in 6 and above
 id	player	sendto		sendport	recvport
-6	0	0		5006		5000
-7	0	1		5007		5012
-8	0	2		5008		5024
-9	0	3		5009		5036
-10	0	4		5010		5048
-11	0	5		5011		5060
+6	0	0		7036		7000
+7	0	1		7042		7001
+8	0	2		5048		7002
+9	0	3		5054		7003
+10	0	4		5060		7004
+11	0	5		5066		7005
+
 ^				^		^
 |				|		|
 |				|		|
 |				|		|
 |				|		|
 |				|
-6+sendto 			5006+12*(player)+sendto
+6+sendto 			7036+6*(player)+sendto
 						|
-						5000+12*sendto+player
+						7000+6*sendto+player
 */
+
+
+
+
+
+
 
 static int nerrno(network1_complete *c, int bind_id) {
         int e = 0;
@@ -2069,7 +2106,7 @@ for (int i=0;i<NUMBER_OF_NETWORK1_PARTICIPANTS;i++) {
   c->poll_state[i] = 0;
   c->communicator[i] = i;
   c->direction[i] = 1;  // will have to do that later
-  c->ports[i] = NETWORK1_START_PORT + c->participant_number * NUMBER_OF_NETWORK1_PARTICIPANTS_TIMES_2  + communicator;
+  c->ports[i] = NETWORK1_START_PORT + c->participant_number * NUMBER_OF_NETWORK1_PARTICIPANTS  + communicator;
   c->sockets[i]=-1;
   strncpy(&(c->ip_addresses_string[i][0]),ips[i],19);
   c->ip_addresses_string[i][19]='\0';
@@ -2093,7 +2130,7 @@ for (int i=0;i<NUMBER_OF_NETWORK1_PARTICIPANTS;i++) {
 
   int send_id=communicator+NUMBER_OF_NETWORK1_PARTICIPANTS;
     
-  c->sent_to_ports[communicator] = NETWORK1_START_PORT + NUMBER_OF_NETWORK1_PARTICIPANTS + communicator * NUMBER_OF_NETWORK1_PARTICIPANTS_TIMES_2  +  c->participant_number; // this is the port we send to from the sender to us receiver
+  c->sent_to_ports[communicator] = NETWORK1_START_PORT + 36 + communicator * NUMBER_OF_NETWORK1_PARTICIPANTS +  c->participant_number; // this is the port we send to from the sender to us receiver
   // this is the port it should come from
   
   
@@ -2129,7 +2166,7 @@ for (int o=NUMBER_OF_NETWORK1_PARTICIPANTS;o<NUMBER_OF_NETWORK1_PARTICIPANTS_TIM
   c->poll_state[o] = 0;
   c->communicator[o] = communicator;  // where we send from
   c->direction[o] = 1;  // will have to do that later
-  c->ports[o] = NETWORK1_START_PORT + NUMBER_OF_NETWORK1_PARTICIPANTS + c->participant_number * NUMBER_OF_NETWORK1_PARTICIPANTS_TIMES_2  + communicator;
+  c->ports[o] = NETWORK1_START_PORT + 36 + c->participant_number * NUMBER_OF_NETWORK1_PARTICIPANTS  + communicator;
   c->sockets[o]=-1;
 //  strncpy[&(c->ip_addresses[o][0]),ips[communicator],19);
 //  c->ip_addresses[o][19]='\0';
@@ -2147,7 +2184,7 @@ for (int o=NUMBER_OF_NETWORK1_PARTICIPANTS;o<NUMBER_OF_NETWORK1_PARTICIPANTS_TIM
   
   c->local_delay_work[o] = nowtime;
 
-  c->sent_to_ports[o] =   NETWORK1_START_PORT + communicator * NUMBER_OF_NETWORK1_PARTICIPANTS_TIMES_2  +  c->participant_number;  /* this is what we semd tp from us to a receiver*/ 
+  c->sent_to_ports[o] =   NETWORK1_START_PORT + communicator * NUMBER_OF_NETWORK1_PARTICIPANTS  +  c->participant_number;  /* this is what we semd tp from us to a receiver*/ 
   {//
     struct sockaddr_in sendToAddr;
     memset ((char *)(& sendToAddr),0, sizeof(struct sockaddr_in));
