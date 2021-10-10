@@ -159,7 +159,6 @@ fflush(stdout);
 }
 
 
-
 void usage() {
   fprintf(stderr," Usage: %s ip0 ip1 ip2 ip3 ip4 ip5 player_id\r\n","test5_player");
   }
@@ -182,10 +181,10 @@ network1_init(c,participant_number,"255.255.255.255",&(argv[1]),
    NULL,&(do_in3),&(do_out3),NULL,
     NULL,NULL,NULL);
 
-
 int r=fcntl(fileno(stdin),F_SETFL,O_NONBLOCK);
 fprintf(stderr,"fcntl r is %d\n",r);
 int stdin_port = network1_add_standard_input_fd(c,fileno(stdin),&(stdin_in1),NULL,&(stdin_in3),NULL);
+
 /*
    &get_receive_buffer,
    &get_new_send_buffer,
@@ -234,9 +233,9 @@ while (running) {
 	 }
        } // if we can send
     
-  fprintf(stderr,"poll check\n");
+//  fprintf(stderr,"poll check\n");
   int result =  network1_poll_check(c);
-  fprintf(stderr,"poll checked %d\n",result);
+//  fprintf(stderr,"poll checked %d\n",result);
   if (result==-1) {
     running=0;
     }

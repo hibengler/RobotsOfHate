@@ -430,6 +430,7 @@ network1_complete *c= (network1_complete *)cv;
 
 
 
+
 while (1) {
   if (cv->poll_state[bind_id]==0) {
     if (!socket_it(c,bind_id)) {
@@ -456,14 +457,14 @@ while (1) {
     //  }
     if (cv->buffers[bind_id]) {
       if (cv->buflen[bind_id]) {
-        if (cv->network1_get_new_receive_buffer) {
-          (*cv->network1_get_new_receive_buffer)(c,bind_id,0);
+        if (cv->network1_get_new_receive_buffer[bind_id]) {
+          (*cv->network1_get_new_receive_buffer[bind_id])(c,bind_id,0);
           }
         }  
       }
     else {
-      if (cv->network1_get_new_receive_buffer) {
-        (*cv->network1_get_new_receive_buffer)(c,bind_id,0);
+      if (cv->network1_get_new_receive_buffer[bind_id]) {
+        (*cv->network1_get_new_receive_buffer[bind_id])(c,bind_id,0);
         }
       }
 
@@ -530,14 +531,14 @@ while (1) {
     //  }
     if (cv->buffers[bind_id]) {
       if (cv->buflen[bind_id]) {
-        if (cv->network1_get_new_receive_buffer) {
-          (*cv->network1_get_new_receive_buffer)(c,bind_id,0);
+        if (cv->network1_get_new_receive_buffer[bind_id]) {
+          (*cv->network1_get_new_receive_buffer[bind_id])(c,bind_id,0);
           }
         }  
       }
     else {
-      if (cv->network1_get_new_receive_buffer) {
-        (*cv->network1_get_new_receive_buffer)(c,bind_id,0);
+      if (cv->network1_get_new_receive_buffer[bind_id]) {
+        (*cv->network1_get_new_receive_buffer[bind_id])(c,bind_id,0);
         }
       }
 
@@ -611,9 +612,9 @@ int rf = c->current_number_of_polls-1;
     fprintf(stderr,"starting char thread %d\n",rf);
     c->pthread_parameters[rf].bind_id=rf;
     c->pthread_parameters[rf].c=  (volatile network1_complete *)c;
-    fprintf(stderr,"starting readchar thread %d %lx\n",i,(long unsigned int)  (&(c->pthread_parameters[rf]) ));
+    fprintf(stderr,"starting readchar thread %d %lx\n",rf,(long unsigned int)  (&(c->pthread_parameters[rf]) ));
 
-    ptstatus = pthread_create(&c->network_thread[rf],NULL,file_read_thread,(void *)(&(c->pthread_parameters[rf])));
+//    ptstatus = pthread_create(&c->network_thread[rf],NULL,file_read_thread,(void *)(&(c->pthread_parameters[rf])));
     if (ptstatus) {
       c->network_thread[rf]=-1;
       fprintf(stderr,"cant make thread number %d\n",rf);
@@ -786,16 +787,15 @@ Set the socket to nonblocking
   
 
 
-
 {
   for (int i=0;i<NUMBER_OF_NETWORK1_PARTICIPANTS;i++) {
     int o = i+NUMBER_OF_NETWORK1_PARTICIPANTS;
     int ptstatus;
     c->pthread_parameters[i].bind_id=i;
     c->pthread_parameters[i].c=  (volatile network1_complete *)c;
-    fprintf(stderr,"starting recv thread %d %lx\n",i,(long unsigned int)  (&(c->pthread_parameters[i]) ));
+    fprintf(stderr,"starting recv thread %d %lx\n",i,(long unsigned int)  (&(c) ));
 
-    ptstatus = pthread_create(&c->network_thread[i],NULL,network_recv_thread,(void *)(&(c->pthread_parameters[i])));
+//    ptstatus = pthread_create(&c->network_thread[i],NULL,network_recv_thread,(void *)(&(c->pthread_parameters[i])));
     if (ptstatus) {
       c->network_thread[i]=-1;
       fprintf(stderr,"cant make thread number %d\n",i);
@@ -805,15 +805,15 @@ Set the socket to nonblocking
     c->pthread_parameters[o].bind_id=o;
     c->pthread_parameters[o].c=  (volatile network1_complete *)c;
     fprintf(stderr,"starting send thread %d %lx\n",o,(long unsigned int)  (&(c->pthread_parameters[o]) ));
-    ptstatus = pthread_create(&c->network_thread[o],NULL,network_send_thread,(void *) (&(c->pthread_parameters[o]) ));
+ //???   ptstatus = pthread_create(&c->network_thread[o],NULL,network_send_thread,(void *) (&(c->pthread_parameters[o]) ));
     if (ptstatus) {
-      fprintf(stderr,"cant make receive thread number %d\n",i);
+      fprintf(stderr,"cant make receive thread number %d\n",o);
       c->network_thread[o]=-1;
       }
     break;
     }    
   }  
-
+  
 return 1;
 }
 
@@ -828,8 +828,9 @@ return 1;
 
 int network1_poll_check(network1_complete *c) {
 int i;
-volatile network1_complete *cv;
+volatile network1_complete *cv=c;
 int number_to_round=0;
+
 
 for (i=0;i<cv->current_number_of_polls;i++) {
   if (cv->call_rounds[i]) number_to_round++;
@@ -946,6 +947,7 @@ full_check_poll_loop:
 //compute_sendable_recieveables(c,1);
 //process_poll_buffer_statuses(c,0);
    
+
    
 return 0;
 }
