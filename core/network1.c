@@ -9,7 +9,9 @@
 #include "network1.h"
 #include <error.h>
 #include <sys/time.h>
-       
+#include <arpa/inet.h>
+#include <pthread.h>
+              
 //
 //
 /*
@@ -77,137 +79,67 @@ id	player	sendto		sendport	recvport
 */
 
 
+static void nsleep() {
+struct timespec req;
+req.tv_sec=0;
+req.tv_nsec=5000000;
+            
+nanosleep(&req,NULL);
+}     
+	      
+	      
+	      
 
 
+int socket_it(network1_complete *c,int bind_id) {
+  volatile network1_complete *cv = c;
 
 
-
-static int nerrno(network1_complete *c, int bind_id) {
-        int e = 0;
-	int initiale=errno;
-	if (initiale!=0) {
-	  if (initiale!=11) {
-  	    fprintf(stderr,"Xerror %d id %d\n",initiale,bind_id);
-	    }
-	  }
-if ((c->type[bind_id]==1)||(c->type[bind_id]==0)) {
-	do {
-  	  socklen_t lenn=sizeof(int);
-	  if (c->sockets[bind_id]==-1) {
-	    return initiale;
-	    }	    
-          getsockopt(c->sockets[bind_id],SOL_SOCKET,SO_ERROR,(void *)&e,&lenn);
-	  if (!e) break;
-	  if (initiale==0) {
-	    initiale=e;
-	    fprintf(stderr,"error %d id %d\n",e,bind_id);
-	    }
-	  else {
-	    fprintf(stderr,"  suberror %d\n",e);
-	    }
-	  } while (1);
-  }
-	return initiale;
-}
-
-// ignore again
-static int nerrnoi(network1_complete *c, int bind_id) {
-        int e = 0;
-	int initiale=errno;
-	if (initiale==11) { initiale=0;}
-	if (initiale!=0) {
-	  if (initiale!=11) {
-  	    fprintf(stderr,"Xerror %d id %d\n",initiale,bind_id);
-	    }
-	  }
-if ((c->type[bind_id]==1)||(c->type[bind_id]==0)) {
-	do {
-  	  socklen_t lenn=sizeof(int);
-	  if (c->sockets[bind_id]==-1) {
-	    return initiale;
-	    }	    
-          getsockopt(c->sockets[bind_id],SOL_SOCKET,SO_ERROR,(void *)&e,&lenn);
-	  if (e==11) continue;
-	  if (!e) break;
-	  if (initiale==0) {
-	    initiale=e;
-	    fprintf(stderr,"error %d id %d\n",e,bind_id);
-	    }
-	  else {
-	    fprintf(stderr,"  suberror %d\n",e);
-	    }
-	  } while (1);
-	  }
-	return initiale;
-}
-
-
-static int clear_errno(network1_complete *c, int bind_id) {
-        int e = 0;
-	int initiale=errno;
-if ((c->type[bind_id]==1)||(c->type[bind_id]==0)) {
-	if (initiale!=0) {
-	  if (initiale!=11) {
-	    }
-	  }
-	do {
-  	  socklen_t lenn=sizeof(int);
-	  if (c->sockets[bind_id]==-1) {
-	    return initiale;
-	    }	    
-          getsockopt(c->sockets[bind_id],SOL_SOCKET,SO_ERROR,(void *)&e,&lenn);
-	  if (!e) break;
-	  if (initiale==0) {
-	    initiale=e;
-	    }
-	  else {
-	    }
-	  } while (1);
-	  }
-	return initiale;
-}
-
-
-
-/* bind where we receive from */
-static int network1_setup_and_bind(network1_complete *c, int bind_id) {
-int s = c->sockets[bind_id];
-if (s==-1) {
-  fprintf(stderr,"new socket id %d\n",bind_id);
-  int e = errno;
-  if ((s=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
-    e = errno;
-    fprintf(stderr,"no socket available error %d\n",e);
-    return(0);
-    }
-  else {
-    c->sockets[bind_id] = s;
-    e = nerrnoi(c,bind_id); 
-    if (e) {
-      fprintf(stderr,"something is wrong new socket %d id %d  error %d\n",s,bind_id,e);
-      c->sockets[bind_id]=-1;
+  int s = cv->sockets[bind_id];
+  if (s==-1) {
+    fprintf(stderr,"new socket id %d\n",bind_id);
+         int e = errno;
+    if ((s=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
+      e = errno;
+      fprintf(stderr,"no socket available error %d\n",e);
       return(0);
       }
+    else {
+      cv->sockets[bind_id] = s;
+      e = errno;
+      if (e) {
+        fprintf(stderr,"something is wrong new socket %d id %d  error %d\n",s,bind_id,e);
+        cv->sockets[bind_id]=-1;
+        return(0);
+        }
+      }
     }
-  }
+  cv->poll_state[bind_id]=1;
+  return (1);  
+}
+
+/* bind where we receive from */
+static int bind_it(network1_complete *c,int bind_id) {
+
+volatile network1_complete *cv = (volatile network1_complete *)c;
 if (bind_id>NUMBER_OF_NETWORK1_PARTICIPANTS) {
+
   fprintf(stderr,"why on sending bind id? %d \n",bind_id);
   return(0);
   }
   // no need to bind sender
-  struct sockaddr * sa = &(c->poll_addresses[bind_id]);
-        memset(sa, 0, sizeof(servaddr));	
-        sa->sin_family = AF_INET; // IPv4
-        sa->sin_addr.s_addr = inet_addr(servip);
-	sa->sin_port = htons(PORT);
+  int communicator = cv->communicator[bind_id];
   
-
-
-clear_errno(c,bind_id);  
+  struct sockaddr_in  * sa = &(c->poll_addresses[bind_id]);
+        memset(sa, 0, sizeof(struct sockaddr_in));	
+        sa->sin_family = AF_INET; // IPv4
+        sa->sin_addr.s_addr = inet_addr(c->ip_addresses_string[communicator]);
+	sa->sin_port = htons(c->ports[communicator]);
+  int s=cv->sockets[bind_id];
 if( bind(s , (struct sockaddr*)&(c->poll_addresses[bind_id]), sizeof(struct sockaddr_in) ) == -1)
     {
     fprintf(stderr,"error bind1 socket %d id %d port %d\n",s,bind_id,c->ports[bind_id]);
-    int e=nerrnoi(c,bind_id);
+    int e=errno;
     if (e!=11) {
       fprintf(stderr,"error bind socket %d id %d err %d\n",s,bind_id,e);
       return(0);
@@ -216,7 +148,7 @@ if( bind(s , (struct sockaddr*)&(c->poll_addresses[bind_id]), sizeof(struct sock
    else 
    {
     fprintf(stderr,"error2 bind socket %d id %d port %d\n",s,bind_id,c->ports[bind_id]);
-    int e=nerrnoi(c,bind_id);
+    int e=errno;
     if (e) {
       if (e!=11) {
         fprintf(stderr,"error b2ind socket %d id %d err %d\n",s,bind_id,e);
@@ -226,7 +158,7 @@ if( bind(s , (struct sockaddr*)&(c->poll_addresses[bind_id]), sizeof(struct sock
     }
  fprintf(stderr,"we are good binding socket %d %d\n",c->sockets[bind_id],bind_id);
    
-c->poll_state[bind_id]=1;
+cv->poll_state[bind_id]=1;
 return 1;
 }
 
@@ -236,9 +168,7 @@ return 1;
 
 
 static void network1_delay_for_milliseconds(network1_complete *c, int bind_id,unsigned int millisecondsa) {
-// here is a hack. c->local_poll_predo_start_time[c->network1_check_poll_runs_in_call] always called first before we do a delay, so we dont need to do gettimeofday 
 struct timeval a,b;
-a =c->local_poll_predo_start_time[c->network1_check_poll_runs_in_call];
 b=a;
 unsigned long milliseconds = millisecondsa;
 unsigned long usec = a.tv_usec;
@@ -254,291 +184,9 @@ a.tv_sec += asec;
 a.tv_usec = tusec;
 fprintf(stderr,"	delay add %d milliseconds to %ld %ld -> %ld %ld\n",millisecondsa,b.tv_sec,b.tv_usec,a.tv_sec,a.tv_usec);
 struct timespec ts;
-ts.time_t = tv_sec;
-ts.tv_nsec = tv.usec*1000l;
-nanosleep(&ts.NULL);
-}
-
-
-
-/* this unconnects the bingding by seting the famult to AF_UNSPEC; */
-static int network1_unconnect(network1_complete *c,int bind_id) {
-    if (c->sockets[bind_id] ==-1) {return 0;}
-       struct sockaddr_in aaa;
-       aaa.sin_family = AF_UNSPEC;
-       aaa.sin_addr.s_addr= 0;
-       aaa.sin_port=0; 
-int e=0;       
-   clear_errno(c,bind_id);
-   if (connect(c->sockets[bind_id],(struct sockaddr *)&aaa,sizeof(struct sockaddr_in)) ==-1) {
-          e=nerrno(c,bind_id);
-          fprintf(stderr,"	EINTR clear connectunlink to connect got errno %d\n",e);
-	  }
-return e;
-}
-
-
-
-/* move the state to state one generically. */
-static int generic_toone(network1_complete *c, int bind_id,int milliseconds) {
-network1_unconnect(c,bind_id);
-c->poll_state[bind_id]=1;
-network1_delay_for_milliseconds(c,bind_id,milliseconds);
-return 0;
-}
-
-static int generic_tothree(network1_complete *c, int bind_id,int milliseconds) {
-c->poll_state[bind_id]=3;
-network1_delay_for_milliseconds(c,bind_id,milliseconds);
-return 0;
-}
-
-static int generic_tozero_screw_sockets(network1_complete *c, int bind_id,int milliseconds) {
-c->sockets[bind_id] = -1;
-c->pollfds[bind_id].fd = -1;
-c->poll_state[bind_id]=0;
-network1_delay_for_milliseconds(c,bind_id,milliseconds);
-return 0;
-}
-
-static int generic_tozero(network1_complete *c, int bind_id,int milliseconds) {
-if (c->sockets[bind_id] != -1) {
-  close(c->sockets[bind_id]);
-  c->sockets[bind_id] = -1;
-  }
-c->pollfds[bind_id].fd = -1;
-c->poll_state[bind_id]=0;
-network1_delay_for_milliseconds(c,bind_id,milliseconds);
-return 0;
-}          
-
-static int generic_enosupport(network1_complete *c, int bind_id) {
-return generic_tozero(c,bind_id,100000);
-}
-
-static int generic_eacces(network1_complete *c, int bind_id) {
-return generic_tozero(c,bind_id,100000);
-}
-
-static int send_eacces(network1_complete *c, int bind_id) {
-return generic_tothree(c,bind_id,100);
-}
-
-static int generic_eperm(network1_complete *c, int bind_id) {
-return generic_tozero(c,bind_id,100000);
-}
-          
-static int generic_eaddrinuse(network1_complete *c, int bind_id) {
-return generic_tozero(c,bind_id,50000);
-}
-          
-static int generic_eaddrnotval(network1_complete *c, int bind_id) {
-return generic_tozero(c,bind_id,100000);
-}
-
-
-static int connect_worked(network1_complete *c, int bind_id) ;
-
-static int generic_wait_for_connect(network1_complete *c, int bind_id) {
-c->pollfds[bind_id].fd = c->sockets[bind_id];
-c->pollfds[bind_id].events = POLLOUT|POLLERR;
-c->poll_state[bind_id]=2;
-//connect_worked(c,bind_id);
-return 1;
-}
-
-
-static int connect_etimeout(network1_complete *c, int bind_id) {
-network1_unconnect(c,bind_id);
-return generic_toone(c,bind_id,2000);
-}
-
-static int send_econnreset(network1_complete *c, int bind_id) {
-network1_unconnect(c,bind_id);
-return generic_toone(c,bind_id,1000);
-}
-
-static int generic_eintr(network1_complete *c, int bind_id) {
-     network1_unconnect(c,bind_id);
-     network1_delay_for_milliseconds(c,bind_id,200);
- return 0;
-}
-
-
-static int send_eintr(network1_complete *c, int bind_id) {
-return   generic_tothree(c,bind_id,100);
-}
-
-static int send_eisconn(network1_complete *c, int bind_id) {
-network1_unconnect(c,bind_id);
-return   generic_toone(c,bind_id,100);
-}
-
-static int send_emsgsize(network1_complete *c, int bind_id) {
-return   generic_tothree(c,bind_id,400);
-}
-
-static int send_epipe(network1_complete *c, int bind_id) {
-return   generic_tozero(c,bind_id,1000);
-}
-
-static int send_estandardreq(network1_complete *c, int bind_id) {
-return   generic_tothree(c,bind_id,100);
-}
-
-static int generic_ebadf(network1_complete *c, int bind_id) {
-return   generic_tozero_screw_sockets(c,bind_id,2000);
-}
-
-static int send_econnrefused(network1_complete *c, int bind_id) {
-return   generic_tothree(c,bind_id,100);
-//return   generic_tozero(c,bind_id,200);
-}
-
-static int generic_econnrefused(network1_complete *c, int bind_id) {
-return   generic_toone(c,bind_id,50);
-}
-
-static int generic_efault(network1_complete *c, int bind_id) {
-return generic_tozero(c,bind_id,300000);
-}
-
-static int generic_eisconn(network1_complete *c, int bind_id) {
-network1_unconnect(c,bind_id);
-return generic_toone(c,bind_id,1000);
-}
-
-
-
-static int generic_enetunreach(network1_complete *c, int bind_id) {
-network1_unconnect(c,bind_id);
-return generic_toone(c,bind_id,2000);
-}
-
-static int generic_eother(network1_complete *c, int bind_id) {
-network1_unconnect(c,bind_id);
-return generic_tozero(c,bind_id,2000);
-}
-
-static int generic_enomem(network1_complete *c, int bind_id) {
-network1_unconnect(c,bind_id);
-return generic_tozero(c,bind_id,2000);
-}
-
-
-static int generic_enotconn(network1_complete *c, int bind_id) {
-network1_unconnect(c,bind_id);
-return generic_toone(c,bind_id,2000);
-}
-
-
-static int connect_eother(network1_complete *c, int bind_id) {
-network1_unconnect(c,bind_id);
-return generic_toone(c,bind_id,1000);
-}
-
-static int generic_enotsock(network1_complete *c, int bind_id) {
-fprintf(stderr,"socket is set to %d\n",c->sockets[bind_id]);
-network1_unconnect(c,bind_id);
-
-return generic_tozero(c,bind_id,300);
-}
-
-static int connect_worked(network1_complete *c, int bind_id) {
-// 2 to 3
-c->pollfds[bind_id].fd = c->sockets[bind_id];
-if (bind_id<NUMBER_OF_NETWORK1_PARTICIPANTS) {
-  c->pollfds[bind_id].events = POLLPRI|POLLIN|POLLERR;
-  }
-else {
-  c->pollfds[bind_id].events = POLLOUT|POLLERR;
-  }
-  
-if (c->type[bind_id]==1) {
-   int result = recv(c->sockets[bind_id],c->buffers[bind_id],NETWORK1_MAX_BUFFER_SIZE,MSG_WAITALL);
-   int e=nerrno(c,bind_id); 
-   fprintf(stderr,"did a listen thing id %d result %d \n",bind_id,result);
-   }
-c->poll_state[bind_id]=3;
-return 1;
-}
-
-
-
-
-
-static int generic_eprototype(network1_complete *c, int bind_id) {
-network1_unconnect(c,bind_id);
-return generic_toone(c,bind_id,5000);
-}
-
-static int generic_eopnotsupp(network1_complete *c, int bind_id) {
-return generic_tothree(c,bind_id,100);
-}
-
-static int send_in_progress(network1_complete *c, int bind_id) {
-      c->poll_state[bind_id]=4;
-      c->pollfds[bind_id].fd=c->sockets[bind_id];
-      c->pollfds[bind_id].events=POLLOUT|POLLERR;
-return 1;
-}
-
-
-static int receive_in_progress(network1_complete *c, int bind_id) {
-
-      c->poll_state[bind_id]=4;
-      c->pollfds[bind_id].fd=c->sockets[bind_id];
-      c->pollfds[bind_id].events=POLLIN|POLLPRI|POLLERR;
-return 1;
-}
-
-
-static int receive_eprototype(network1_complete *c, int bind_id) {
-return generic_tothree(c,bind_id,500);
-}
-
-static int receive_einval(network1_complete *c, int bind_id) {
-return generic_tothree(c,bind_id,500);
-}
-
-static int send_einval(network1_complete *c, int bind_id) {
-return generic_tothree(c,bind_id,500);
-}
-
-static int receive_eof(network1_complete *c, int bind_id) {
-return generic_tozero(c,bind_id,5000);
-}
-
-static int send_eof(network1_complete *c, int bind_id) {
-return generic_tozero(c,bind_id,5000);
-}
-
-static int send_enobuffs(network1_complete *c, int bind_id) {
-return generic_tothree(c,bind_id,50);
-}
-
-static int send_ealready(network1_complete *c, int bind_id) {
-return generic_tothree(c,bind_id,50);
-}
-
-static int receive_gotit(network1_complete *c, int bind_id,int result) {
-  c->buflen[bind_id]=result;
-  c->call_rounds[bind_id]=1;
-  c->poll_state[bind_id]=5;
-return 1;
-}
-
-
-static int send_gotit(network1_complete *c, int bind_id) {
-c->poll_state[bind_id]=5;
-c->call_rounds[bind_id]=1;
-return 1;
-}
-
-static int receive_eintr(network1_complete *c, int bind_id) {
-      c->pollfds[bind_id].fd = -1;
-      c->poll_state[bind_id]=3;
-      network1_delay_for_milliseconds(c,bind_id,50);
+ts.tv_sec = a.tv_sec;
+ts.tv_nsec = a.tv_usec*1000l;
+nanosleep(&ts,NULL);
 }
 
 
@@ -546,1081 +194,33 @@ static int receive_eintr(network1_complete *c, int bind_id) {
 
 
 
-// in mode 2	  	  
-static int network1_handle_connect_error(network1_complete *c, int bind_id,int e) {
-int i=bind_id;
-if (c->poll_state[i]==2) { // yes it is 2 here - different than the connect that is 1
-    c->pollfds[bind_id].fd = -1;
-    c->poll_state[i]==1;   
-    }
-if (e) {
-  if (e==EAFNOSUPPORT)  {
-    fprintf(stderr,"EAFNOSUPPORT  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-    generic_enosupport(c,bind_id);
-    }
-  else if (e==EACCES) {
-    fprintf(stderr,"EACCES  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-    generic_eacces(c,bind_id);
-    }
-  else if (e== EPERM) {
-       fprintf(stderr,"EPERM  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-       generic_eperm(c,bind_id);
-    }
-   else if (e==EADDRINUSE) {
-       fprintf(stderr,"	EADDRINUSE  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-       generic_eaddrinuse(c,bind_id);      
-	}  // address in use 
-   else if (e==EADDRNOTAVAIL) {
-     fprintf(stderr,"	EADDRNOTAVAIL  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-     generic_eaddrnotval(c,bind_id);
-     }  // address in use 
-   //??? note - EAGAIN is only used here for unix. others have insufficient routing cache and need to retry
-  else if ((e==EAGAIN)    ||(e==EALREADY) || (e== EINPROGRESS)) {
-    if (e==EAGAIN) {
-        fprintf(stderr,"EAGAIN working \n");
-	}
-    else if (e==EALREADY) {
-        fprintf(stderr,"EALREADY working \n");
-	}
-    else {
-      fprintf(stderr,"EINPROGRESS  working \n");
-      }
-    generic_wait_for_connect(c,bind_id);
-    e=0;
-    return(0);    
-    }
-  else if (e==EINTR) {
-    fprintf(stderr,"	warning EINTR  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-    generic_eintr(c,bind_id);
-    }  
-  else if (e==EBADF) {
-     fprintf(stderr,"   EBADF  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-     generic_ebadf(c,bind_id);
-     }
-  else if (e==ECONNREFUSED) {
-     fprintf(stderr,"   warning ECONNREFUSED  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-     generic_econnrefused(c,bind_id);
-     }
-  else if (e==EFAULT) {
-    fprintf(stderr,"   EFAULT  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-    generic_efault(c,bind_id);
-    }
-  else if (e==EISCONN) {
-    fprintf(stderr,"	warning EISCONN  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-    generic_eisconn(c,bind_id);
-    }   
-  else if (e==ENETUNREACH) {
-    // try again in 2 seconds
-    fprintf(stderr,"warning ENETUNREACH clear connectunlink to connect got errno %d\n",e);
-    generic_enetunreach(c,bind_id);
-    e=0;
-    }
-  else if (e==ENOTSOCK) {
-    generic_enotsock(c,bind_id);
-    e=0;
-    }
-  else if (e==EPROTOTYPE) { 
-    fprintf(stderr,"   EPROTOTYPE  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-    generic_eprototype(c,bind_id);
-    }
-  else if (e==ETIMEDOUT) {
-    fprintf(stderr,"warning ETIMEOUT clear connectunlink to connect got errno %d\n",e);
-    connect_etimeout(c,bind_id);
-    }
-  else {
-    fprintf(stderr,"warning unknown clear connectunlink to connect got errno %d\n",e);
-    connect_eother(c,bind_id);
-    }    
-  return(0);
-  }  
-else {
-  // we are good - we got the connect no errnos
-  connect_worked(c,bind_id);
-  }
-return(1);
-}  
-
-
-
-
-// instant connect from type 1 - no polling
-static int network1_connect_to_outside_poll(network1_complete *c, int bind_id) {
-fprintf(stderr,"connecting to %d\n",bind_id);
-if (connect(c->sockets[bind_id],(struct sockaddr *)&(c->sending_to[bind_id]),sizeof(struct sockaddr_in)) ==-1) {
-  int e = nerrno(c,bind_id);
-  if (e==EAFNOSUPPORT)  {
-    fprintf(stderr,"EAFNOSUPPORT  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-    generic_enosupport(c,bind_id);
-    }
-  else if (e==EACCES) {
-    fprintf(stderr,"EACCES  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-    generic_eacces(c,bind_id);
-    }
-  else if (e== EPERM) {
-       fprintf(stderr,"EPERM  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-       generic_eperm(c,bind_id);
-    }
-   else if (e==EADDRINUSE) {
-       fprintf(stderr,"	EADDRINUSE  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-       generic_eaddrinuse(c,bind_id);      
-	}  // address in use 
-   else if (e==EADDRNOTAVAIL) {
-     fprintf(stderr,"	EADDRNOTAVAIL  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-     generic_eaddrnotval(c,bind_id);
-     }  // not avail
-   //??? note - EAGAIN is only used here for unix. others have insufficient routing cache and need to retry
-   else if ((e==EAGAIN)    ||(e==EALREADY) || (e== EINPROGRESS)) {
-     if (e==EAGAIN) {
-        fprintf(stderr,"EAGAIN working \n");
-	}
-     else if (e==EALREADY) {
-        fprintf(stderr,"EALREADY working \n");
-	}
-     else {
-        fprintf(stderr,"EINPROGRESS  working \n");
-        }
-    generic_wait_for_connect(c,bind_id);
-    return(0);
-    }
-   else if (e==EINTR) {
-     fprintf(stderr,"	warning EINTR  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-     generic_eintr(c,bind_id);
-     }   
-  else if (e==ENETUNREACH) {
-    // try again in 2 seconds
-    fprintf(stderr,"warning ENETUNREACH clear connectunlink to connect got errno %d\n",e);
-    generic_enetunreach(c,bind_id);
-    }
-  else if (e==ENOTSOCK) {
-    generic_enotsock(c,bind_id);
-    }
-  else if (e==EPROTOTYPE) { 
-    fprintf(stderr,"   EPROTOTYPE  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-    generic_eprototype(c,bind_id);
-    }
-  else if (e==ETIMEDOUT) {
-    fprintf(stderr,"warning ETIMEOUT clear connectunlink to connect got errno %d\n",e);
-    connect_etimeout(c,bind_id);
-    }
-  else {
-    fprintf(stderr,"erro rother  clear connectunlink to connect got errno %d\n",e);
-    connect_eother(c,bind_id);  
-    }
-  }  
-else {
-  // we are good - we got the connect no errnos
-  fprintf(stderr,"worked\n");
-  connect_worked(c,bind_id);
-  }
-return 1;
-} 
-  
 
 
 
 
 
-static int network1_handle_receive_error(network1_complete *c,int bind_id,int e) {
-fprintf(stderr,"here we are %d\n",e);
-if (e==0) {  // end of file
-  receive_eof(c,bind_id);
-  }
-else {    
-  int e = nerrno(c,bind_id);
-  if (e==0) { // end of file
-    receive_eof(c,bind_id);
-    }
-  else 	{		    
-    if ((e==EAGAIN)||(e==EWOULDBLOCK)||(e==EINPROGRESS)) {
-      receive_in_progress(c,bind_id);
-      }   
-    else if (e==EBADF) {
-      fprintf(stderr,"   EBADF  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      generic_ebadf(c,bind_id);
-      }
-    else if (e==ECONNREFUSED) {
-      fprintf(stderr,"   ECONNREFUSED  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      generic_econnrefused(c,bind_id);
-      }
-    else if (e==EFAULT) {
-      fprintf(stderr,"   EFAULT  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      generic_efault(c,bind_id);
-      }
-    else if (e==EINTR) {
-      fprintf(stderr,"   EINTR  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-//      close (c->sockets[bind_id]);
-      receive_eintr(c,bind_id);
-      }
-    else if (e==EINVAL) {
-      fprintf(stderr,"   EINVAL  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      receive_einval(c,bind_id);
-      
- //     close (c->sockets[bind_id]);
- //     c->sockets[bind_id]=-1;
- //     c->pollfds[bind_id].fd = -1;
- //     c->poll_state[bind_id]=0;
- //     network1_delay_for_milliseconds(c,bind_id,1000);
-      }
-    else if (e==ENOMEM) {
-      fprintf(stderr,"   NOMEM  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      generic_enomem(c,bind_id);
-//      close (c->sockets[bind_id]);
-//      c->sockets[bind_id]=-1;
-//      c->pollfds[bind_id].fd = -1;
-//      c->poll_state[bind_id]=0;
-//      network1_delay_for_milliseconds(c,bind_id,1000);
-      }
-    else if (e==ENOTCONN) {
-      fprintf(stderr,"warning ENOTCONN  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      generic_enotconn(c,bind_id);
-//      close (c->sockets[bind_id]);
-//      c->pollfds[bind_id].fd = -1;
-//      c->poll_state[bind_id]=1;
-//      network1_delay_for_milliseconds(c,bind_id,100);
-      }
-    else if (e==ENOTSOCK) {
-      fprintf(stderr,"  ENOTSOCK  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      generic_enotsock(c,bind_id);
-//      c->sockets[bind_id]=-1;
-//      c->pollfds[bind_id].fd = -1;
-//      c->poll_state[bind_id]=0;
-//      network1_delay_for_milliseconds(c,bind_id,1000);
-      }
-    else {
-       fprintf(stderr,"  recva generic errno  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      generic_eother(c,bind_id);
-//      c->sockets[bind_id]=-1;
-//      c->pollfds[bind_id].fd = -1;
-//      c->poll_state[bind_id]=0;
-//      network1_delay_for_milliseconds(c,bind_id,1000);
-      }
-    }  // if e is not 0
-  } // if result is negative
-
-return (0);
-}     
-
-
-
-
-
-static int network1_attempt_receive(network1_complete *c,int bind_id, int polled) {
-fprintf(stderr,"recv hey %d\n",polled);
-clear_errno(c,bind_id);
-c->poll_state[bind_id]=4;  // waiting for read
-// MSG_DONTROUTE = later
-int result = recv(c->sockets[bind_id],c->buffers[bind_id],NETWORK1_MAX_BUFFER_SIZE,MSG_WAITIALL);
-//9/*MSG_DONTWAIT*/);
-fprintf(stderr," rd %d got out %d of %d from %d to %d\n",bind_id,result,c->buflen[bind_id],c->sent_to_ports[bind_id],c->ports[bind_id]);
-if (result==0) {  // end of file
-  clear_errno(c,bind_id);
-  receive_eof(c,bind_id);
-  }
-else if (result >0) {
-  clear_errno(c,bind_id);
-  receive_gotit(c,bind_id,result);
-  }
-else {    
-  int e = nerrno(c,bind_id);
-  if (e==0) { // end of file
-    receive_eof(c,bind_id);
-    }
-  else 	{		    
-    if ((e==EAGAIN)||(e==EWOULDBLOCK)||(e==EINPROGRESS)) {
-       if (e==EAGAIN) {fprintf(stderr,"EAGAIN\n");}
-       if (e==EWOULDBLOCK) {fprintf(stderr,"ewouldblock\n");}
-       if (e==EINPROGRESS) {fprintf(stderr,"einprogress\n");}
-     
-      fprintf(stderr,"recv in_progress %d  ogs result %d e %d  hey\n",bind_id,result,e);
-      receive_in_progress(c,bind_id);
-      }   
-    else if (e==EBADF) {
-      fprintf(stderr,"   EBADF  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      generic_ebadf(c,bind_id);
-      }
-    else if (e==ECONNREFUSED) {
-      fprintf(stderr,"   ECONNREFUSED  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      generic_econnrefused(c,bind_id);
-      }
-    else if (e==EFAULT) {
-      fprintf(stderr,"   EFAULT  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      generic_efault(c,bind_id);
-      }
-    else if (e==EINTR) {
-      fprintf(stderr,"   EINTR  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-//      close (c->sockets[bind_id]);
-      receive_eintr(c,bind_id);
-      }
-    else if (e==EINVAL) {
-      fprintf(stderr,"   EINVAL  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      receive_einval(c,bind_id);
-      
- //     close (c->sockets[bind_id]);
- //     c->sockets[bind_id]=-1;
- //     c->pollfds[bind_id].fd = -1;
- //     c->poll_state[bind_id]=0;
- //     network1_delay_for_milliseconds(c,bind_id,1000);
-      }
-    else if (e==ENOMEM) {
-      fprintf(stderr,"   NOMEM  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      generic_enomem(c,bind_id);
-//      close (c->sockets[bind_id]);
-//      c->sockets[bind_id]=-1;
-//      c->pollfds[bind_id].fd = -1;
-//      c->poll_state[bind_id]=0;
-//      network1_delay_for_milliseconds(c,bind_id,1000);
-      }
-    else if (e==ENOTCONN) {
-      fprintf(stderr,"warning ENOTCONN  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      generic_enotconn(c,bind_id);
-//      close (c->sockets[bind_id]);
-//      c->pollfds[bind_id].fd = -1;
-//      c->poll_state[bind_id]=1;
-//      network1_delay_for_milliseconds(c,bind_id,100);
-      }
-    else if (e==ENOTSOCK) {
-      fprintf(stderr,"  ENOTSOCK  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      generic_enotsock(c,bind_id);
-//      c->sockets[bind_id]=-1;
-//      c->pollfds[bind_id].fd = -1;
-//      c->poll_state[bind_id]=0;
-//      network1_delay_for_milliseconds(c,bind_id,1000);
-      }
-    else {
-      fprintf(stderr,"  recvb generic errno  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      generic_eother(c,bind_id);
-//      c->sockets[bind_id]=-1;
-//      c->pollfds[bind_id].fd = -1;
-//      c->poll_state[bind_id]=0;
-//      network1_delay_for_milliseconds(c,bind_id,1000);
-      }
-    }  // if e is not 0
-  } // if result is negative
-
-return (0);
-}     
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-static int network1_handle_send_error(network1_complete *c,int bind_id,int e) {
-//c->poll_state[bind_id]=4;  // waiting for read
-fprintf(stderr,"handle out e is %d\n",e);
-if (e==0) {  // end of file
-  send_eof(c,bind_id);
-  }
-else {    
-  if (e==0) { // end of file
-    send_eof(c,bind_id);
-    }
-  else 	{		    
-    if ((e==EAGAIN)||(e==EWOULDBLOCK)||(e==EINPROGRESS)) {
-      fprintf(stderr,"we are here\n");
-      send_in_progress(c,bind_id);
-      }   
-    else if (e==EACCES) {
-      fprintf(stderr,"   EBADF  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      send_eacces(c,bind_id);
-      }
-    else if (e==EALREADY) {
-      fprintf(stderr,"   EALREADY  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      send_ealready(c,bind_id);
-      }
-    else if (e==EBADF) {
-      fprintf(stderr,"   EBADF  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      generic_ebadf(c,bind_id);
-      }
-    else if (e==ECONNREFUSED) {
-      fprintf(stderr,"   ECONNREFUSED  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      send_econnrefused(c,bind_id);
-      }
-      
-    else if (e==ECONNRESET) {
-      fprintf(stderr,"   econnreset  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      send_econnreset(c,bind_id);
-      }
-    else if (e==EDESTADDRREQ) {
-      send_estandardreq(c,bind_id);
-      }
-    else if (e==EFAULT) {
-      fprintf(stderr,"   EFAULT  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      generic_efault(c,bind_id);
-      }
-    else if (e==EINTR) {
-      fprintf(stderr,"   EINTR  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      send_eintr(c,bind_id);
-      }
-    else if (e==EINVAL) {
-      fprintf(stderr,"   EIONVAL  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      send_einval(c,bind_id);
-      }
-      
-    else if (e==EISCONN) {
-      fprintf(stderr,"   EISCONN  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      send_eisconn(c,bind_id);
-      }
-    else if (e==EMSGSIZE) {
-      fprintf(stderr,"   EMSGSIZE  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      send_emsgsize(c,bind_id);
-      }
-    else if (e==ENOBUFS) {
-      fprintf(stderr,"   ENOBUFS  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      send_enobuffs(c,bind_id);
-      }
-    else if (e==ENOMEM) {
-      fprintf(stderr,"   NOMEM  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      generic_enomem(c,bind_id);
-      }
-    else if (e==ENOTCONN) {
-      fprintf(stderr,"warning ENOTCONN  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      generic_enotconn(c,bind_id);
-      }
-    else if (e==ENOTSOCK) {
-      fprintf(stderr,"  ENOTSOCK  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      generic_enotsock(c,bind_id);
-      }
-    else if (e==EOPNOTSUPP) {
-      fprintf(stderr,"  EOPNOTSUPP  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      generic_eopnotsupp(c,bind_id);
-      }
-    else if (e==EPIPE) {
-      fprintf(stderr,"  epipe  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      send_epipe(c,bind_id);
-      }
-    else {
-      fprintf(stderr,"  send generic errno  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      generic_eother(c,bind_id);
-      }
-    }  // if e is not 0
-  } // if result is negative
-
-return (0);
-}  // handke)Send_error
-		  
 			
 
             
 	    
 
-static int network1_attempt_send(network1_complete *c,int bind_id) {
-int e=0;
-int result = send(c->sockets[bind_id],c->buffers[bind_id],c->buflen[bind_id],MSG_CONFIRM);
-fprintf(stderr," sd %d got out %d of %d from %d to %d\n",bind_id,result,c->buflen[bind_id],c->ports[bind_id],c->sent_to_ports[bind_id]);
 
-if (result==0) {  // end of file
-  send_eof(c,bind_id);
-  }
-else if (result >0) {
-  e= nerrno(c,bind_id);
-  if ((e==EAGAIN)||(e==EWOULDBLOCK)||(e==EINPROGRESS)) {
-    fprintf(stderr,"would wait on it\n");
-    fprintf(stderr,"gotit2\n");
-    send_gotit(c,bind_id);
-    }
-  else if (e==0) {	  
-    fprintf(stderr,"gotit1\n");
-    send_gotit(c,bind_id);
-    }
-  else {
-    goto yuck;
-    }
-  }
-else {    
-  e = nerrno(c,bind_id);
-yuck:  
-  if (e==0) { // end of file
-    send_eof(c,bind_id);
-    }
-  else 	{
-    fprintf(stderr, "got error %d    \n",e);	    
-    if ((e==EAGAIN)||(e==EWOULDBLOCK)||(e==EINPROGRESS)) {
-      send_in_progress(c,bind_id);
-      fprintf(stderr,"we are in progress yo\n");
-      }   
-    else if (e==EACCES) {
-      fprintf(stderr,"   EACCES  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      send_eacces(c,bind_id);
-      }
-    else if (e==EALREADY) {
-      fprintf(stderr,"   EALREADY  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      send_ealready(c,bind_id);
-      }
-    else if (e==EBADF) {
-      fprintf(stderr,"   EBADF  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      generic_ebadf(c,bind_id);
-      }      
-    else if (e==ECONNREFUSED) {
-      fprintf(stderr,"   ECONNREFUSED  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      send_econnrefused(c,bind_id);
-      }
-    else if (e==ECONNRESET) {
-      fprintf(stderr,"   econnreset  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      send_econnreset(c,bind_id);
-      }
-    else if (e==EDESTADDRREQ) {
-      send_estandardreq(c,bind_id);
-      }
-    else if (e==EFAULT) {
-      fprintf(stderr,"   EFAULT  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      generic_efault(c,bind_id);
-      }
-    else if (e==EINTR) {
-      fprintf(stderr,"   EINTR  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      send_eintr(c,bind_id);
-      }
-    else if (e==EINVAL) {
-      fprintf(stderr,"   EIONVAL  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      send_einval(c,bind_id);
-      }
-    else if (e==EISCONN) {
-      fprintf(stderr,"   EISCONN  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      send_eisconn(c,bind_id);
-      }
-    else if (e==EMSGSIZE) {
-      fprintf(stderr,"   EMSGSIZE  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      send_emsgsize(c,bind_id);
-      }
-    else if (e==ENOBUFS) {
-      fprintf(stderr,"   ENOBUFS  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      send_enobuffs(c,bind_id);
-      }
-    else if (e==ENOMEM) {
-      fprintf(stderr,"   NOMEM  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      generic_enomem(c,bind_id);
-      }
-    else if (e==ENOTCONN) {
-      fprintf(stderr,"warning ENOTCONN  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      generic_enotconn(c,bind_id);
-      }
-    else if (e==ENOTSOCK) {
-      fprintf(stderr,"  ENOTSOCK  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      generic_enotsock(c,bind_id);
-      }
-    else if (e==EOPNOTSUPP) {
-      fprintf(stderr,"  EOPNOTSUPP  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      generic_eopnotsupp(c,bind_id);
-      }
-    else if (e==EPIPE) {
-      fprintf(stderr,"  epipe  %d id %d port %d\n",c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      send_epipe(c,bind_id);
-      }
-    else {
-      fprintf(stderr,"  sendb generic errno  %d socket %d id %d port %d\n",e,c->sockets[bind_id],bind_id,c->ports[bind_id]);
-      generic_eother(c,bind_id);
-      }
-    }  // if e is not 0
-  } // if result is negative
-fprintf(stderr," e is %d state is %d buffer is %lx bufken is %d\n",  e,c->poll_state[bind_id],(unsigned long)(&c->buffers[bind_id][0]),c->buflen[bind_id]);
-return (0);
-}  // attempt_Send     
-		  
-			
-			            
-	
-/* this might do nothing if we dont have buffers to receive */	    
-static int network1_set_buffer_if_necessary_and_receive_from_poll(network1_complete *c,int bind_id) {
-// assume state is 3 or 5
-// assume i is not player number
-// assume there is no timer
-//if ((c->poll_state[bind_id])==5) {
-//  fprintf(stderr,"5 wipeout  thtrwrwrw \n");
-//  c->poll_state[bind_id] = 3;
-//  c->buflen[bind_id]=0;
-//  c->buffers[bind_id]=NULL;
-//  }
-  
-if (c->buffers[bind_id]) {
-  if (c->buflen[bind_id]) {
-    if (c->network1_get_new_receive_buffer) {
-      (*c->network1_get_new_receive_buffer)(c,bind_id,0);
-      }
-    }
-  }
-else {
-  if (c->network1_get_new_receive_buffer) {
-    (*c->network1_get_new_receive_buffer)(c,bind_id,0);
-      }
-  }
-  
-  
-if (c->buffers[bind_id]) {
-  if (!(c->buflen[bind_id])) {
-    return (network1_attempt_receive(c,bind_id,0));
-    }
-  }  	
-return 0;
-}
-
-
-
-// Both:	      
-//  if the state is 5 - you can do it, but the state will turn to 3.
-// if the state is 4 - you cannot do it
-// if the state is 3, 2, or 1, you can do it , unless it is NULL
-// normally you do not need to call this because the buffers are asked for
-int network1_set_buffer(network1_complete *c,int bind_id,char *buffer, int buflen,int force_flag) 
-{
-if (c->poll_state[bind_id] == 4) {
-  return 4;
-  }
-if (!force_flag) {
-  if ((c->poll_state[bind_id] == 3)&&(c->buflen[bind_id]=!0)&&(c->buffers[bind_id]==NULL)) { 
-    return 3;
-    }
-  if ((c->poll_state[bind_id] == 2)&&(c->buflen[bind_id]=!0)&&(c->buffers[bind_id]==NULL)) {
-    return 2;
-    }
-  if ((c->poll_state[bind_id] == 1)&&(c->buflen[bind_id]=!0)&&(c->buffers[bind_id]==NULL)) {
-    return 1;
-    }
-  if ((c->poll_state[bind_id] == 0)&&(c->buflen[bind_id]=!0)&&(c->buffers[bind_id]==NULL)) {
-    return 1;
-    }
-  }
-c->buflen[bind_id]=0;
-c->buffers[bind_id]=buffer;
-c->buflen[bind_id] = buflen;
-return 0;
-}  
-  
-
-
-				      
-static int network1_send_if_can(network1_complete *c,int bind_id) {
-// assume poll state is 3, or 5.  If 5, well, we reset the buffer
-//assume i is not player number
-// assume thers is no timer
-
-if (c->buffers[bind_id]) {
-  if (c->buflen[bind_id]) {
-    return network1_attempt_send(c,bind_id);
-    }
-  else {
-    if (c->network1_pull_next_send_buffer_from_queue[bind_id]) {
-      (*c->network1_pull_next_send_buffer_from_queue[bind_id])(c,bind_id,0);
-      }
-    }
-  }
-else {
-  if (c->network1_pull_next_send_buffer_from_queue[bind_id]) {
-    (*c->network1_pull_next_send_buffer_from_queue[bind_id])(c,bind_id,0);
-    }
-  }
-  
-if ((c->buffers[bind_id]!=NULL)&&(c->buflen[bind_id])) {
-    return network1_attempt_send(c,bind_id);
-    }
-  else {
-    if (c->buffers[bind_id]==NULL) {
-    if (c->network1_get_new_send_buffer[bind_id]) {
-      (*c->network1_get_new_send_buffer[bind_id])(c,bind_id,0);
-      }
-    }
-  if (c->buffers[bind_id]) {
-    if (c->buflen[bind_id]) {
-      return network1_attempt_send(c,bind_id);
-      
-      }
-    }
-  
-  }
-
-
-return 0;
-}
   
 
 
 																      
 																																      
 																																																      
-																																																																      
-																																																																																      
-																																																																																																      
-static int error_continuance(network1_complete *c,int i,struct timeval thedate) {
-int communicator = c->communicator[i];
-// block
-struct timeval a,b;
-b = thedate;
-a = c->local_delay_work[i];
-if ((a.tv_sec > b.tv_sec) || (
-     ((a.tv_sec == b.tv_sec) && (a.tv_usec  >= b.tv_usec))) ) { // we are delayed. leave as is
-// maybe     c->pollfd.fd = -1;
-  fprintf(stderr,"%ld %ld   to %ld %6ld rcontinue\n",a.tv_sec,a.tv_usec,b.tv_sec,b.tv_usec);
-  if (i>=NUMBER_OF_NETWORK1_PARTICIPANTS) {
-    c->sendable[communicator] = 0;
-    }
-  else {
-    c->recieveable[communicator] = 0;
-    }
-  return 1;
-  }
-return 0;  
-} 
-
-																																																																																																																																																      
-																																																																																																																																																																      
-																																																																																																																																																																																      
-static int handle_three(network1_complete *c,int i,struct timeval thedate,int first_time) {
-
-if (c->communicator[i]==c->participant_number) {  
-  return 1;
-  }
-int communicator = c->communicator[i];
-if (c->poll_state[i]==3) {
-      network1_set_buffer_if_necessary_and_receive_from_poll(c,i);
-    }
-  else if (i<NUMBER_OF_NETWORK1_PARTICIPANTS_TIMES_2) {
-      network1_send_if_can(c,i);
-    }
-  // now we ran, if there is no buffer, but I thinkg its still sendable
-return(0);     
-}
-
-														
-																																																																																																																																																																																																													      
-																																																																																																																																																																																																																																																																																																																																																																																																												      
-																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																											      
-																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																										      
-																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																									      
-																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																								      
-																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																							      
-static void format_difference_date(char *s,struct timeval a,struct timeval b) {
-long au = a.tv_usec - b.tv_usec;
-long as = a.tv_sec - b.tv_sec;
-long am = as *1000 + (au/1000);
-sprintf(s,"%4ld",am);
-}
-																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																						      
-
-static int compute_sendable_recieveable(network1_complete *c,int cm,int nothing) {
-int i=cm;
-  if ((c->poll_state[c->sending_poll[i]]) >=6) {
-    c->sendable[i]=0;
-    } 
-  if ((c->poll_state[c->receiving_poll[i]]) >=6) {
-    c->recieveable[i]=0;
-    } 
-  c->responsive[i] = c->sendable[i]  & c->recieveable[i];
-  if ((c->poll_state[c->sending_poll[i]]) >=7) {
-    c->countdown[i]=0;
-    } 
-  if ((c->poll_state[c->receiving_poll[i]]) >=7) {
-    c->countdown[i]=0;
-    } 
-  if( (c->poll_state[c->sending_poll[i]]) >=8) {
-    c->alive[i]=0;
-    } 
-  if ((c->poll_state[c->receiving_poll[i]]) >=8) {
-    c->alive[i]=0;
-    } 
-  
-return 0;  
-}
 
 
 
-
-
-static int compute_sendable_recieveables(network1_complete *c,int nothing) {
-for (int cm=0;cm<6;cm++) {
-  compute_sendable_recieveable(c,cm,0);
-  }
-return 0;
-}
-
-
-
-
-
-
-static int go_around_timeouts(network1_complete *c,int cm, struct timeval nowtime)  {
-int ii= c->receiving_poll[cm];
-int oo= c->sending_poll[cm];
-//if( (c->poll_state[oo]==5)||(c->poll_state[oo]==2)|| (c->poll_state[oo]==4)) {
-if (c->poll_state[oo]==5) {
-  c->local_delay_work[oo] =  nowtime;
-  c->local_delay_work[ii] =  nowtime;
-  }
-else if(c->poll_state[ii]==5) {
-  c->local_delay_work[oo] =  nowtime;
-  c->local_delay_work[ii] =  nowtime;
-  }
-}    
      
       
 
-
-
-static int process_poll_buffer_status(network1_complete *c,int cm,int compute_statistics_at_end) {
-int communicator =cm;
-int ii=c->receiving_poll[communicator];
-int oo=c->sending_poll[communicator];
-compute_statistics_at_end=0; // force it
-if (c->buffers[ii]) {
-  if (c->buflen[ii]) {
-    c->recv_buffer_full[communicator] = 1;
-    c->recv_buffer_missing[communicator] = 0;
-    c->recv_buffer_ready[communicator] = 0;
-    }
-  else {
-    c->recv_buffer_full[communicator] = 0;
-    c->recv_buffer_missing[communicator] = 0;
-    c->recv_buffer_ready[communicator] = 1;
-    }
-  }
-else {
-  c->recv_buffer_full[communicator] = 0;
-  c->recv_buffer_missing[communicator] = 1;
-  c->recv_buffer_ready[communicator] = 0;
-  }
-if (compute_statistics_at_end) {
-  if (c->recv_buffer_full[communicator]) {
-    c->recieveable[communicator]=0;
-    }
-  if (c->poll_state[oo]==4) { // if we are state 4
-    c->recieveable[communicator]=1;
-    }
-  else {
-    if (!c->recv_buffer_missing[communicator]) {
-      c->recieveable[communicator]=0;
-      }
-    }
-  } 
-    
-    
-
-if (c->buffers[oo]) {
-  if (c->buflen[oo]) {
-    c->send_buffer_full[communicator]=1;
-    c->send_buffer_ready[communicator]=0;
-    c->send_buffer_missing[communicator]=0;
-    }
-  else {
-    c->send_buffer_full[communicator]=0;
-    c->send_buffer_ready[communicator]=1;
-    c->send_buffer_missing[communicator]=0;
-    }
-  }
-else {
-  c->send_buffer_full[communicator]=0;
-  c->send_buffer_ready[communicator]=0;
-  c->send_buffer_missing[communicator]=1;
-  }
-  
-if (compute_statistics_at_end) {
-  if (c->poll_state[oo]==4)  {
-    if (!c->send_buffer_full[communicator]) {
-      c->sendable[communicator]=0;
-      }
-    }
-  else if (c->poll_state[oo]==3)  {
-    if (c->send_buffer_missing[communicator]) {
-      c->sendable[communicator]=0;
-      }
-    }
-  }
-
-return 0;
-}
-
-
-static int process_poll_buffer_statuses(network1_complete *c,int compute_statistics_at_end) {
-for (int i=0;i<6;i++) {
-   process_poll_buffer_status(c,i,compute_statistics_at_end);
-  }
-return 0;
-}
-
-static int network1_reset_sendable_and_stuff(network1_complete *c,int i) {
-  c->sendable[i]=1;
-  c->recieveable[i]=1;
-  c->responsive[i]=1;
-  c->countdown[i]=1;
-  c->alive[i]=1;
-  return 0;
-}
-
-/*jj*/
-static int network1_reset_sendables_and_stuff(network1_complete *c) {
-for (int i=0;i<NUMBER_OF_NETWORK1_PARTICIPANTS;i++) {
-  c->sendable[i]=1;
-  c->recieveable[i]=1;
-  c->responsive[i]=1;
-  c->countdown[i]=1;
-  c->alive[i]=1;
-  }
-  return 0;
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-int network1_poll_check(network1_complete *c) {
-
-
-
-sigset_t set;
-int s;
-struct timeval ts;
-ts.tv_sec=0;
-ts.tv_usec=0;
-/* from man pthread_sigmask abd poll */
-sigemptyset(&set);
-sigaddset(&set, SIGQUIT);
-sigaddset(&set, SIGUSR1);
-
-gettimeofday(&(c->local_poll_predo_start_time[c->network1_check_poll_runs_in_call]),NULL);
-
-// call_rounds is used to decide wheteher to call the round1-round3 to externally process messages
-for (int i=0;i<c->current_number_of_polls;i++) {
-  c->call_rounds[i]=0;
-  }
-  
-
-
-network1_reset_sendables_and_stuff(c);
-/* clear out revents, and turn off write polls if not necessary. read polls are necessary */
-for (int i=0;i<c->current_number_of_polls;i++) {
-  {
-//  clear_errno(c,i);
-  if ((c->type[i]==2)) {
-    if (c->poll_state[i]==3) {
-      if (c->buffers[i]) {
-        if (!c->buflen[i]) {
-	  int e=errno;
-          int result=read(c->sockets[i],&(c->buffers[i][0]),2047);
-	  fprintf(stderr,"read sock %d %lx got %d errno %d\n",c->sockets[i],(long)&(c->buffers[i]),result,e);
-	  if (result>=0) {
-	    c->buflen[i]=result;
-	    c->poll_state[i]=5;
-	    c->call_rounds[i]=1;
-	    }
-	  else if (result<0) {
-  	    int e=errno;
-	    if ((e==EAGAIN)||(e==EWOULDBLOCK)) {
-	      c->poll_state[i]=4;
-              c->pollfds[i].fd=c->sockets[i];
-	      }
-	    }
-          } // if there is nothing in the buffer
-        } // if we have a buffer
-      } // if we have a poll state of 2
-//    clear_errno(c,i);
-    
-    continue;
-    } // if we art type 2
-  else if ((c->type[i]==3)) {
-//    clear_errno(c,i);  
-    continue;
-    }
-  else {
-    if (c->sockets[i]!=-1) {
-      int option_len = sizeof(int);
-      int option_value=0;
-      int rc = getsockopt(
-        c->sockets[i], SOL_SOCKET, SO_ACCEPTCONN, (char *) &option_value, &option_len);
-      if (rc == 0)
-      {
-      if (option_len == sizeof(int))
-        {
-            fprintf(stderr,"id %d socket %d acceptconn %d\n",i,c->sockets[i],option_value);
-            }
-      }
-      }
-
-      }
-  
-    int communicator =c->communicator[i];
-    c->pollfds[i].fd=-1; // dont poll as default 
-    if (c->communicator[i]==c->participant_number) {
-//      clear_errno(c,i);  
-      continue;
-      }
-    
-    go_around_timeouts(c,communicator,c->local_poll_predo_start_time[c->network1_check_poll_runs_in_call]);
-      
-    if (error_continuance(c,i,c->local_poll_predo_start_time[c->network1_check_poll_runs_in_call]))  {
-//      clear_errno(c,i);
-      continue;
-      }
-
-  
-    if (c->poll_state[i]==0) {
-      if (!network1_setup_and_bind(c,i)) {
-        fprintf(stderr,"cannot bind port\n") ;return(-1);
-	}
-      }
-    if (c->poll_state[i]==1) {
-      network1_connect_to_outside_poll(c,i);
-      }
-    if (c->poll_state[i]==2) {
-      c->pollfds[i].fd=c->sockets[i]; // we will poll the connection -- if we are done with waiting . might go to 3
-      }
-    
-    
-    if (c->poll_state[i]==5) {  // this was actioned earlier, and we got past the wait time
-
-	c->buflen[i]=0;
-        c->poll_state[i]=3;
-      }
-    if (c->poll_state[i]>=6) {  // we are keeping the buffer as is - still need to send it
-      c->poll_state[i]=3;
-      }    
-
-    if ((c->poll_state[i]==4)) {
-      c->pollfds[i].fd=c->sockets[i];
-      fprintf(stderr,"waiting on id %d socket %d\n",i,c->sockets[i]);
-      }
-
-    if (handle_three(c,i, c->local_poll_predo_start_time[c->network1_check_poll_runs_in_call],1)) {
-//      clear_errno(c,i);
-      continue;
-      }     
-
-    /* now clean revents */
-    c->pollfds[i].revents=0;
-  
-    }  // our clean up and set  for polling
-//  clear_errno(c,i);
-  } // for all polls
-
-compute_sendable_recieveables(c,1); 
-process_poll_buffer_statuses(c,0);  
   
 
   
   
-  
-gettimeofday(&(c->local_poll_predo_end_time[c->network1_check_poll_runs_in_call]),NULL); 
 
 
 
@@ -1629,42 +229,7 @@ gettimeofday(&(c->local_poll_predo_end_time[c->network1_check_poll_runs_in_call]
 
 
 
-
-
-/* ----------------------- here is the poll command ------------------------ */
-int number_of_events = poll(&(c->pollfds[0]), c->current_number_of_polls,0);		
-  
-
-
-gettimeofday(&(c->local_poll_end_time[c->network1_check_poll_runs_in_call]),NULL); 
-
-
-
-int number_to_round=0;
-for (int i=0;i<c->current_number_of_polls;i++) {
-  if (c->call_rounds[i]) number_to_round++;
-  }
-compute_sendable_recieveables(c,0);  
-process_poll_buffer_statuses(c,1);  
-  
-
-if (!(number_of_events+number_to_round)) {
-  c->local_handle_end_time[c->network1_check_poll_runs_in_call]=		c->local_poll_end_time[c->network1_check_poll_runs_in_call];
-  c->local_round1_end_time[c->network1_check_poll_runs_in_call]=		c->local_poll_end_time[c->network1_check_poll_runs_in_call];
-  c->local_round2_end_time[c->network1_check_poll_runs_in_call]=		c->local_poll_end_time[c->network1_check_poll_runs_in_call];
-  c->local_round3_end_time[c->network1_check_poll_runs_in_call]=		c->local_poll_end_time[c->network1_check_poll_runs_in_call];
-  c->local_postdo_end_time[c->network1_check_poll_runs_in_call]=		c->local_poll_end_time[c->network1_check_poll_runs_in_call];
-  c->local_network1_check_end_time=					        c->local_poll_end_time[c->network1_check_poll_runs_in_call];
-  
-  goto full_check_poll_loop;
-  }
-
-
-// OK - so we are handling the polls
-// I am not going to speed up the delays here
-
-// and we can use the sendable and recieveable stuff to do less.
-{ // Block to handle the polls 
+#ifdef reader
   for (int i=0;i<c->current_number_of_polls;i++) {
     if ((c->type[i]==2)) {
       if (c->pollfds[i].revents&(POLLIN|POLLPRI)) {
@@ -1673,7 +238,6 @@ if (!(number_of_events+number_to_round)) {
 	  if (result>0) {
 	    c->buflen[i]=result;
 	    c->poll_state[i]=5;
-	    c->call_rounds[i]=1;
 	    }
 	  else if (result<0) {
 	    int e=nerrno(c,i);
@@ -1689,84 +253,8 @@ if (!(number_of_events+number_to_round)) {
     else if ((c->type[i]==3)) {
       continue;
       }
-       
-  
-    if (c->poll_state[i]==2) { // doing a connect and waaiting for POLLOUT
-      int e=0;
-      if (c->pollfds[i].revents&(POLLOUT|POLLERR)) {
-        e = 0;
-	socklen_t lenn=sizeof(int);
-        e=nerrno(c,i);
-        network1_handle_connect_error(c,i,e);
-      
 
-        if (handle_three(c,i, c->local_poll_end_time[c->network1_check_poll_runs_in_call],0)) {
-           continue;
-          }     
-        } /* if we are ca connect and got a return value  on state 2 */ 
-      }  /* if state=2 , connection possibly made */
-    else if (c->poll_state[i]==4) { // doing a send or receive 
-      if (c->type[i]==0) { // if receive
-        int e=0;
-        if (c->pollfds[i].revents&(POLLERR)) {
-          e = 0;
-	  socklen_t lenn=4;
-          getsockopt(c->sockets[i],SOL_SOCKET,SO_ERROR,(void *)&e,&lenn);
-          c->pollfds[i].fd=-1;       
-          network1_handle_receive_error(c,i,e);
-          }
-        else if (c->pollfds[i].revents&(POLLIN|POLLPRI)) {
-          network1_attempt_receive(c,i,1);
-	  }
-	} // if input
-      else if (c->type[i]==1) { //  send
-        int e=0;
-        if (c->pollfds[i].revents&(POLLERR)) {
-          e = 0;
-	  socklen_t lenn=4;
-          getsockopt(c->sockets[i],SOL_SOCKET,SO_ERROR,(void *)&e,&lenn);
-          c->pollfds[i].fd=-1;       
-          network1_handle_send_error(c,i,e);
-          }
-        else if (c->pollfds[i].revents&POLLOUT) {
-	  fprintf(stderr,"Poll says ok\n");
-	  network1_attempt_send(c,i);
-          fprintf(stderr,"githtotr5r\n");
-//          send_gotit(c,i);
-//        c->call_rounds[bind_id]=1;
-//	  c->poll_state[bind_id]=5;
-	  }
-	} // if output
-	
-      } // if state is 4
-    } // while going through all events
-  }     /* special block to handle connect polling */
-  
 
-// note - this above block could reduce the nuber of events that passed, but will never increase it 
-// so we can call start_round/stop/round anyways - sometimes witouth any other events
-
-// recompute number_to_round for round 1
-number_to_round=0;
-for (int i=0;i<c->current_number_of_polls;i++) {
-  if (c->call_rounds[i]) number_to_round++;
-  }
-
-gettimeofday(&(c->local_handle_end_time[c->network1_check_poll_runs_in_call]),NULL);
-
-process_poll_buffer_statuses(c,0);  
-
-if (!number_to_round) {
-  c->local_round1_end_time[c->network1_check_poll_runs_in_call]=		c->local_handle_end_time[c->network1_check_poll_runs_in_call];
-  c->local_round2_end_time[c->network1_check_poll_runs_in_call]=		c->local_handle_end_time[c->network1_check_poll_runs_in_call];
-  c->local_round3_end_time[c->network1_check_poll_runs_in_call]=		c->local_handle_end_time[c->network1_check_poll_runs_in_call];
-  c->local_postdo_end_time[c->network1_check_poll_runs_in_call]=		c->local_handle_end_time[c->network1_check_poll_runs_in_call];
-  c->local_network1_check_end_time					=        c->local_handle_end_time[c->network1_check_poll_runs_in_call];
-  
-  goto full_check_poll_loop;
-  return 0;
-  }
-  
 
 
 
@@ -1776,11 +264,6 @@ if (!number_to_round) {
     (*c->network1_action_start_round1)(c,number_of_events,number_to_round);
     }
     
-  for (int i=0;i<c->current_number_of_polls;i++) {
-    if (c->call_rounds[i]) {    
-      if  (c->network1_handle_action_round1[i]) { (*c->network1_handle_action_round1[i])(c,i,number_of_events);  }
-      }
-    } /* while loopint through all events */
   
   if ((number_of_events) &&(c->network1_action_finish_round1)) {
     (*c->network1_action_finish_round1)(c,number_of_events,number_to_round);
@@ -1791,23 +274,9 @@ if (!number_to_round) {
 
 
 // recompute number_to_round after round 1
-number_to_round=0;
-for (int i=0;i<c->current_number_of_polls;i++) {
-  if (c->call_rounds[i]) number_to_round++;
-  }
 
-process_poll_buffer_statuses(c,0);  
 
-gettimeofday(&(c->local_round1_end_time[c->network1_check_poll_runs_in_call]),NULL);
 
-if (!number_to_round) {
-  c->local_round2_end_time[c->network1_check_poll_runs_in_call]=		c->local_round1_end_time[c->network1_check_poll_runs_in_call];
-  c->local_round3_end_time[c->network1_check_poll_runs_in_call]=		c->local_round1_end_time[c->network1_check_poll_runs_in_call];
-  c->local_postdo_end_time[c->network1_check_poll_runs_in_call]=		c->local_round1_end_time[c->network1_check_poll_runs_in_call];
-  c->local_network1_check_end_time			=                       c->local_round1_end_time[c->network1_check_poll_runs_in_call];
-  
-  goto full_check_poll_loop;
-  }
   
 
 
@@ -1817,10 +286,6 @@ if (!number_to_round) {
     (*c->network1_action_start_round2)(c,number_of_events,number_to_round);
     }
     
-  for (int i=0;i<c->current_number_of_polls;i++) {
-    if (c->call_rounds[i]) {    
-      if  (c->network1_handle_action_round2[i]) { (*c->network1_handle_action_round2[i])(c,i,number_of_events);  }
-      }
     } /* while loopint through all events */
   
   if ((number_of_events) &&(c->network1_action_finish_round2)) {
@@ -1832,22 +297,7 @@ if (!number_to_round) {
   
   
 
-// recompute number_to_round after round 2
-number_to_round=0;
-for (int i=0;i<c->current_number_of_polls;i++) {
-  if (c->call_rounds[i]) number_to_round++;
-  }
-process_poll_buffer_statuses(c,0);  
 
-gettimeofday(&(c->local_round2_end_time[c->network1_check_poll_runs_in_call]),NULL);
-
-if (!number_to_round) {
-  c->local_round3_end_time[c->network1_check_poll_runs_in_call]=		c->local_round2_end_time[c->network1_check_poll_runs_in_call];
-  c->local_postdo_end_time[c->network1_check_poll_runs_in_call]=		c->local_round2_end_time[c->network1_check_poll_runs_in_call];
-  c->local_network1_check_end_time			=                       c->local_round2_end_time[c->network1_check_poll_runs_in_call];
-  
-  goto full_check_poll_loop;
-  }
   
   
 
@@ -1858,12 +308,7 @@ if (!number_to_round) {
     (*c->network1_action_start_round3)(c,number_of_events,number_to_round);
     }
     
-  for (int i=0;i<c->current_number_of_polls;i++) {
-    if (c->call_rounds[i]) {    
-      if  (c->network1_handle_action_round3[i]) { (*c->network1_handle_action_round3[i])(c,i,number_of_events);  }
-      }
-    } /* while loopint through all events */
-  
+
   if ((number_of_events) &&(c->network1_action_finish_round3)) {
     (*c->network1_action_finish_round3)(c,number_of_events,number_to_round);
     }
@@ -1872,79 +317,181 @@ if (!number_to_round) {
   } // block to process events round 3
 
 
-// recompute number_to_round after round 3 - to use later
-number_to_round=0;
-for (int i=0;i<c->current_number_of_polls;i++) {
-  if (c->call_rounds[i]) number_to_round++;
-  }
-process_poll_buffer_statuses(c,0);  
-
-gettimeofday(&(c->local_round3_end_time[c->network1_check_poll_runs_in_call]),NULL);
-
-
-if (!number_to_round) {
-  c->local_postdo_end_time[c->network1_check_poll_runs_in_call]=		c->local_round3_end_time[c->network1_check_poll_runs_in_call];
-  c->local_network1_check_end_time			=                       c->local_round3_end_time[c->network1_check_poll_runs_in_call];
-  
-  goto full_check_poll_loop;
-  }
-  
-
-full_check_poll_loop:
-
-
-network1_reset_sendables_and_stuff(c);
-  
-/* Extra read all about it -- postdo  */
-for (int i=0;i<c->current_number_of_polls;i++) {
-  if (c->type[i]==2) {continue;}
-  if (c->type[i]==3) {continue;}
-  int communicator = c->communicator[i];
-  
-  /* since we are not looping right now, start a send or receive for any type 3's */
-  if (c->communicator[i]==c->participant_number) {
-    continue;
-    }
-     
-
-  if (error_continuance(c,i,c->local_round3_end_time[c->network1_check_poll_runs_in_call]))  continue;
-  }
-compute_sendable_recieveables(c,1); 
-process_poll_buffer_statuses(c,0);  
-
-gettimeofday(&(c->local_postdo_end_time[c->network1_check_poll_runs_in_call]),NULL);
-
-
-
-
-c->network1_check_poll_runs_in_call++;
-
-// later on we can loop around a few times to make it more efficient.
-gettimeofday(&(c->local_network1_check_end_time),NULL);
-
-{
-  char ds[30];
-  char dpr[30];
-  char dpl[30];
-  char dh[30];
-  char d1[30];
-  char d2[30];
-  char d3[30];
-  char dps[30];
-  
-  char dse[30];
-  
-//  fprintf(stderr,"\n\n	Date %s 	= pre %s	pl %s	ph %s		r1 %s r2 %s	r3 %s ps %s\n",dse,dpr,dpl,dh,d1,d2,d3,dps);
-  }
 
 return number_to_round;
 }
 
+#endif
 
 
 
 
 
+
+
+
+void *network_send_thread(void *arg) {
+int bind_id = ((network1_pthread_parameters *) arg)->bind_id;
+volatile struct network1_complete *cv =  ((network1_pthread_parameters *) arg)->c;
+network1_complete *c= (network1_complete *)cv;
+
+while (1) {
+  if (c->poll_state[bind_id]==0) {
+    if (!socket_it(c,bind_id)) {
+      continue;
+      }
+    c->poll_state[bind_id]=3;
+    }  
+// if (c->poll_state[bind_id]==1) {
+//    if (!bind_it(c,bind_id)) {
+//      continue;
+//      }
+  int flag;
+  if ((cv->poll_state[bind_id]==3)||(cv->poll_state[bind_id]==5)) {
+    // assume poll state is 3, or 5.  If 5, well, we reset the buffer
+    //assume i is not player number
+    // assume thers is no timer
+
+    if (c->buffers[bind_id]) {
+      if (c->buflen[bind_id]) {
+        flag=1;
+        }   
+      else { 
+        if (c->network1_pull_next_send_buffer_from_queue[bind_id]) {
+          (*c->network1_pull_next_send_buffer_from_queue[bind_id])(c,bind_id,0);
+          }
+       }
+      }       
+    else {
+      if (c->network1_pull_next_send_buffer_from_queue[bind_id]) {
+        (*c->network1_pull_next_send_buffer_from_queue[bind_id])(c,bind_id,0);
+        }     
+      }
+
+    if ((c->buffers[bind_id]!=NULL)&&(c->buflen[bind_id])) {
+        flag=1;
+        }
+      else {
+        if (c->buffers[bind_id]==NULL) {
+        if (c->network1_get_new_send_buffer[bind_id]) {
+          (*c->network1_get_new_send_buffer[bind_id])(c,bind_id,0);
+          }
+        }
+      if (c->buffers[bind_id]) {
+        if (c->buflen[bind_id]) {
+          flag=1;
+          } 
+        }
+      }     
+    if (flag) {
+      int e=0;
+      struct sockaddr_in  clientaddr;
+
+	memset(&clientaddr, 0, sizeof(struct sockaddr_in));
+        // Filling server information 
+  int communicator = c->communicator[bind_id];
+
+        clientaddr.sin_family = AF_INET;
+        clientaddr.sin_addr.s_addr = inet_addr(c->ip_addresses_string[bind_id]);
+        clientaddr.sin_port = htons(c->sent_to_ports[bind_id]);
+
+      int result = sendto(c->sockets[bind_id],c->buffers[bind_id],c->buflen[bind_id],MSG_CONFIRM,(const struct sockaddr *) &clientaddr,
+                        sizeof(clientaddr));
+      if(result<=0) {
+        continue;
+        }
+      c->poll_state[bind_id]=4;
+	 
+      fprintf(stderr," sd %d got out %d of %d from %d to %d\n",bind_id,result,c->buflen[bind_id],c->ports[bind_id],c->sent_to_ports[bind_id]);
+      continue;
+      }
+    else {
+      }
+    }
+  else {
+    fprintf(stderr,"%d weird state %d\n",bind_id,c->poll_state[bind_id]);
+    }
+  nsleep();
+  
+  }
+return 0;
+}
+
+   
+      
+
+  
+void *network_recv_thread(void *arg) {
+int bind_id = ((network1_pthread_parameters *) arg)->bind_id;
+volatile struct network1_complete *cv =  ((network1_pthread_parameters *) arg)->c;
+network1_complete *c= (network1_complete *)cv;
+
+
+
+while (1) {
+  if (cv->poll_state[bind_id]==0) {
+    if (!socket_it(c,bind_id)) {
+      continue;
+      }
+    cv->poll_state[bind_id]=2;
+    }  
+  if (cv->poll_state[bind_id]==2) {
+    if (!bind_it(c,bind_id)) {
+      continue;
+      }
+    cv->poll_state[bind_id]=3;
+    }  
+  if ((cv->poll_state[bind_id]==3)||(cv->poll_state[bind_id]==5)) {
+    int flag=0;
+    // assume state is 3 or 5
+    // assume i is not player number
+    // assume there is no timer
+    //if ((c->poll_state[bind_id])==5) {
+    //  fprintf(stderr,"5 wipeout  thtrwrwrw \n");
+    //  c->poll_state[bind_id] = 3;
+    //  c->buflen[bind_id]=0;
+    //  c->buffers[bind_id]=NULL;
+    //  }
+    if (cv->buffers[bind_id]) {
+      if (cv->buflen[bind_id]) {
+        if (cv->network1_get_new_receive_buffer) {
+          (*cv->network1_get_new_receive_buffer)(c,bind_id,0);
+          }
+        }  
+      }
+    else {
+      if (cv->network1_get_new_receive_buffer) {
+        (*cv->network1_get_new_receive_buffer)(c,bind_id,0);
+        }
+      }
+
+
+    if (cv->buffers[bind_id]) {
+      if (!(cv->buflen[bind_id])) {
+        flag=1;
+        }
+      }
+    if (flag) {
+      cv->poll_state[bind_id]=4;  // waiting for read
+      int result = recv(c->sockets[bind_id],c->buffers[bind_id],NETWORK1_MAX_BUFFER_SIZE,MSG_WAITALL);
+      fprintf(stderr," rd %d got out %d of %d from %d to %d\n",bind_id,result,c->buflen[bind_id],c->sent_to_ports[bind_id],c->ports[bind_id]);
+      if (result==0) {  // end of file
+        }
+      else if (result >0) { 
+        }
+      else {     
+        continue;
+        }
+      continue;
+      }
+    }
+  else {
+    fprintf(stderr,"%d weird state %d\n",bind_id,c->poll_state[bind_id]);
+    }
+  nsleep();
+  }
+return 0;
+}
 
 
 
@@ -1962,17 +509,13 @@ int network1_add_standard_input_fd(network1_complete *c,int fd,
      network1_complete_round_call network1_handle_action_round3_in,   
      network1_complete_round_call network1_get_new_receive_buffer) {
 int i=  c->current_number_of_polls;
-c->call_rounds[i]=0;
 c->buflen[i]=0;
 c->change_buffer_flag[i] = 0;
 c->type[i] = 2;                         // read file
 
-gettimeofday(&(c->local_delay_work[i]),NULL);
-c->broadcast_permission[0]=0;
 
 c->poll_state[i] = 3;
 c->communicator[i]=-1;
-c->direction[i]=0;
 c->ports[i]=0;
 memset(&(c->sending_to[i]),0,sizeof(struct sockaddr_in));
 c->sent_to_ports[i]=0;
@@ -2035,21 +578,19 @@ for (int i=0;i<NUMBER_OF_NETWORK1_PARTICIPANTS;i++) {
   c->type[i] = 0; // read from sender
   c->poll_state[i] = 0;
   c->communicator[i] = i;
-  c->direction[i] = 1;  // will have to do that later
   c->ports[i] = NETWORK1_START_PORT + c->participant_number * NUMBER_OF_NETWORK1_PARTICIPANTS  + communicator;
   c->sockets[i]=-1;
   strncpy(&(c->ip_addresses_string[i][0]),ips[i],19);
   c->ip_addresses_string[i][19]='\0';
   
-  c->local_delay_work[i] = nowtime;
   
   {
     struct sockaddr_in inAddr;
     memset ((char *)(& inAddr),0, sizeof(struct sockaddr_in));
     inAddr.sin_family = AF_INET;                 /* Internet address family */
-    fprintf(stderr,"listen %s\n",ips[participant_number]);
+//    fprintf(stderr,"listen %s\n",ips[participant_number]);
     inAddr.sin_addr.s_addr = inet_addr(ips[participant_number]); /* all inqddr go to me. address is the output address*/
-    fprintf(stderr,"got %d port %d\n",inAddr.sin_addr.s_addr,c->ports[i]);
+//    fprintf(stderr,"got %d port %d\n",inAddr.sin_addr.s_addr,c->ports[i]);
 //  inAddr.sin_addr.s_addr = htonl(INADDR_ANY);  -- more indiscriminate
     inAddr.sin_port = htons(c->ports[i]);         /* listen to our ip address on the given port */
     c->poll_addresses[i] = inAddr;
@@ -2074,14 +615,12 @@ for (int i=0;i<NUMBER_OF_NETWORK1_PARTICIPANTS;i++) {
     c->sending_to[i] = sendToAddr;  /* we filter to see if it is from the same thing */
     }
 
-  c->receiving_poll[communicator] = i;
 
   c->pollfds[i] = (struct pollfd){fd:-1,events:POLLIN|POLLPRI|POLLERR,revents:0};
 
   c->buflen[i]= 0;
   c->buffers[i]= NULL;
     
-  c->broadcast_permission[i] = 0;
   c->network1_handle_action_round1[i] = network1_handle_action_round1_in;
   c->network1_handle_action_round2[i] = network1_handle_action_round2_in;
   c->network1_handle_action_round3[i] = network1_handle_action_round3_in;
@@ -2095,13 +634,11 @@ for (int o=NUMBER_OF_NETWORK1_PARTICIPANTS;o<NUMBER_OF_NETWORK1_PARTICIPANTS_TIM
   c->type[o] = 1; // read from sender
   c->poll_state[o] = 0;
   c->communicator[o] = communicator;  // where we send from
-  c->direction[o] = 1;  // will have to do that later
   c->ports[o] = NETWORK1_START_PORT + 36 + c->participant_number * NUMBER_OF_NETWORK1_PARTICIPANTS  + communicator;
   c->sockets[o]=-1;
 //  strncpy[&(c->ip_addresses[o][0]),ips[communicator],19);
 //  c->ip_addresses[o][19]='\0';
 
-  c->sending_poll[communicator] = o;
   {
     struct sockaddr_in inAddr;
     memset ((char *)(& inAddr),0, sizeof(struct sockaddr_in));
@@ -2112,7 +649,6 @@ for (int o=NUMBER_OF_NETWORK1_PARTICIPANTS;o<NUMBER_OF_NETWORK1_PARTICIPANTS_TIM
     c->poll_addresses[o] = inAddr;
     }
   
-  c->local_delay_work[o] = nowtime;
 
   c->sent_to_ports[o] =   NETWORK1_START_PORT + communicator * NUMBER_OF_NETWORK1_PARTICIPANTS  +  c->participant_number;  /* this is what we semd tp from us to a receiver*/ 
   {//
@@ -2120,7 +656,7 @@ for (int o=NUMBER_OF_NETWORK1_PARTICIPANTS;o<NUMBER_OF_NETWORK1_PARTICIPANTS_TIM
     memset ((char *)(& sendToAddr),0, sizeof(struct sockaddr_in));
     sendToAddr.sin_family = AF_INET;                 /* Internet address family */
     sendToAddr.sin_addr.s_addr = inet_addr(ips[communicator]); /* all inqddr go to me. address is the output address*/
-    fprintf(stderr,"to for %d is %s : %d\n",o,ips[communicator],sendToAddr.sin_addr.s_addr);
+//    fprintf(stderr,"to for %d is %s : %d\n",o,ips[communicator],sendToAddr.sin_addr.s_addr);
 //    sendToAddr.sin_addr.s_addr = htonl(INADDR_ANY);
     sendToAddr.sin_port = htons(c->sent_to_ports[o]);         /* listen to our ip address on the given port */
     c->sending_to[o] = sendToAddr;                      
@@ -2131,7 +667,6 @@ for (int o=NUMBER_OF_NETWORK1_PARTICIPANTS;o<NUMBER_OF_NETWORK1_PARTICIPANTS_TIM
   c->buflen[o]= 0;
   c->buffers[o]= NULL;
     
-  c->broadcast_permission[o] = 0;
   
   c->network1_handle_action_round1[o] = network1_handle_action_round1_out;
   c->network1_handle_action_round2[o] = network1_handle_action_round2_out;
@@ -2139,7 +674,7 @@ for (int o=NUMBER_OF_NETWORK1_PARTICIPANTS;o<NUMBER_OF_NETWORK1_PARTICIPANTS_TIM
   c->network1_get_new_send_buffer[o] = network1_get_new_send_buffer;
   c->network1_pull_next_send_buffer_from_queue[o] = network1_pull_next_send_buffer_from_queue;
   
-  
+  }
   
  /*
 // note for windows 
@@ -2158,11 +693,46 @@ Set the socket to nonblocking
 
 */
   
-  }
+
+
+
+{
+  for (int i=0;i<NUMBER_OF_NETWORK1_PARTICIPANTS;i++) {
+    int o = i+NUMBER_OF_NETWORK1_PARTICIPANTS;
+    int ptstatus;
+    fprintf(stderr,"starting send thread %d\n",o);
+    c->pthread_parameters[o].bind_id=o;
+    c->pthread_parameters[o].c=  (volatile network1_complete *)c;
+    fprintf(stderr,"starting send thread %d %lx\n",i,(long unsigned int)  (&(c->pthread_parameters[o]) ));
+
+    ptstatus = pthread_create(&c->network_thread[i],NULL,network_recv_thread,(void *)(&(c->pthread_parameters[i])));
+    if (ptstatus) {
+      c->network_thread[i]=-1;
+      fprintf(stderr,"cant make thread number %d\n",i);
+      }
+    c->pthread_parameters[i].bind_id=i;
+    c->pthread_parameters[i].c=  (volatile network1_complete *)c;
+    fprintf(stderr,"starting send thread %d %lx\n",i,(long unsigned int)  (&(c->pthread_parameters[o]) ));
+    ptstatus = pthread_create(&c->network_thread[o],NULL,network_send_thread,(void *) (&(c->pthread_parameters[o]) ));
+    if (ptstatus) {
+      fprintf(stderr,"cant make receive thread number %d\n",i);
+      c->network_thread[o]=-1;
+      }
+    break;
+    }    
+  }  
+
 return 1;
 }
 
 
-/* end of network1,c */
+
+
+int network1_poll_check(network1_complete *c) {
+return 0;
+}
+
+
+/* end of network1.c */
 
 																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																														      																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																														

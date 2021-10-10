@@ -42,14 +42,19 @@ struct network1_complete;
 typedef void (*network1_complete_round_call)(struct network1_complete *,int,int);
 
 
+typedef struct network1_pthread_parameters {
+  volatile struct network1_complete *c;
+  int bind_id;
+  } network1_pthread_parameters;
+
 typedef struct network1_complete {
   int participant_number;/* 0-4 for players, 5 for an overseer */
   int current_number_of_polls;
 
   char ip_addresses_string[NUMBER_OF_NETWORK1_PARTICIPANTS][20];
 			     
-  pthread_t receiving_thread[NUMBER_OF_NETWORK1_PARTICIPANTS];  // redundant // !*
-  pthread_t sending_thread[NUMBER_OF_NETWORK1_PARTICIPANTS];    // redundant // !*
+  
+  
   
   int sendable[NUMBER_OF_NETWORK1_PARTICIPANTS];  // makes it easier to know id sendable or receiveable
   int recieveable[NUMBER_OF_NETWORK1_PARTICIPANTS];  // makes it easier to know is receiveable
@@ -109,6 +114,11 @@ networjk_attempt_send needs it full
 
   
         
+  pthread_t network_thread[MAX_NUMBER_OF_POLLS];  // redundant // !*
+  pthread_attr_t pthread_attrubutes[MAX_NUMBER_OF_POLLS];  // currently null
+  struct network1_pthread_parameters pthread_parameters[MAX_NUMBER_OF_POLLS];
+  
+  
   int buflen[MAX_NUMBER_OF_POLLS];
   char *buffers[MAX_NUMBER_OF_POLLS];
   int temp_dont_poll_yet[MAX_NUMBER_OF_POLLS];

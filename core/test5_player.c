@@ -154,29 +154,6 @@ for (int i=0;i<6;i++) {
   fprintf(stdout,"	  to 	%d %s\r\n",i,sent_buffers[i]);
   fprintf(stdout,"%s	 you 	%d %s\r\n\r\n",me,i,convo_buffers[i]);
   }
-{
-  char ds[30];
-  char dpr[30];
-  char dpl[30];
-  char dh[30];
-  char d1[30];
-  char d2[30];
-  char d3[30];
-  char dps[30];
-  
-  char dse[30];
-  
-  format_difference_date(dse,c->local_check_start_time,c->local_network1_check_end_time);
-  format_difference_date(ds,c->local_check_start_time,c->local_poll_predo_start_time[0]);
-  format_difference_date(dpr,c->local_poll_predo_start_time[0],c->local_poll_predo_end_time[0]);
-  format_difference_date(dpl,c->local_poll_predo_end_time[0],c->local_poll_end_time[0]);
-  format_difference_date(dh,c->local_poll_end_time[0],c->local_handle_end_time[0]);
-  format_difference_date(d1,c->local_handle_end_time[0],c->local_round1_end_time[0]);
-  format_difference_date(d2,c->local_round1_end_time[0],c->local_round2_end_time[0]);
-  format_difference_date(d3,c->local_round2_end_time[0],c->local_round3_end_time[0]);
-  format_difference_date(dps,c->local_round3_end_time[0],c->local_postdo_end_time[0]);
-  fprintf(stdout,"\r\n\r\n	Date %s 	= pre %s	pl %s	ph %s		r1 %s r2 %s	r3 %s ps %s\r\n",dse,dpr,dpl,dh,d1,d2,d3,dps);
-  }
   
 fflush(stdout);
 }
