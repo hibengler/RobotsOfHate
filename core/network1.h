@@ -119,6 +119,9 @@ networjk_attempt_send needs it full
   struct network1_pthread_parameters pthread_parameters[MAX_NUMBER_OF_POLLS];
   
   
+
+  int call_rounds[MAX_NUMBER_OF_POLLS];
+    
   int buflen[MAX_NUMBER_OF_POLLS];
   char *buffers[MAX_NUMBER_OF_POLLS];
   int temp_dont_poll_yet[MAX_NUMBER_OF_POLLS];

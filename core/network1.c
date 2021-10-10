@@ -336,13 +336,13 @@ volatile struct network1_complete *cv =  ((network1_pthread_parameters *) arg)->
 network1_complete *c= (network1_complete *)cv;
 
 while (1) {
-  if (c->poll_state[bind_id]==0) {
+  if (cv->poll_state[bind_id]==0) {
     if (!socket_it(c,bind_id)) {
       continue;
       }
-    c->poll_state[bind_id]=3;
+    cv->poll_state[bind_id]=3;
     }  
-// if (c->poll_state[bind_id]==1) {
+// if (cv->poll_state[bind_id]==1) {
 //    if (!bind_it(c,bind_id)) {
 //      continue;
 //      }
@@ -352,33 +352,33 @@ while (1) {
     //assume i is not player number
     // assume thers is no timer
 
-    if (c->buffers[bind_id]) {
-      if (c->buflen[bind_id]) {
+    if (cv->buffers[bind_id]) {
+      if (cv->buflen[bind_id]) {
         flag=1;
         }   
       else { 
-        if (c->network1_pull_next_send_buffer_from_queue[bind_id]) {
-          (*c->network1_pull_next_send_buffer_from_queue[bind_id])(c,bind_id,0);
+        if (cv->network1_pull_next_send_buffer_from_queue[bind_id]) {
+          (*cv->network1_pull_next_send_buffer_from_queue[bind_id])(c,bind_id,0);
           }
        }
       }       
     else {
-      if (c->network1_pull_next_send_buffer_from_queue[bind_id]) {
-        (*c->network1_pull_next_send_buffer_from_queue[bind_id])(c,bind_id,0);
+      if (cv->network1_pull_next_send_buffer_from_queue[bind_id]) {
+        (*cv->network1_pull_next_send_buffer_from_queue[bind_id])(c,bind_id,0);
         }     
       }
 
-    if ((c->buffers[bind_id]!=NULL)&&(c->buflen[bind_id])) {
+    if ((cv->buffers[bind_id]!=NULL)&&(c->buflen[bind_id])) {
         flag=1;
         }
       else {
-        if (c->buffers[bind_id]==NULL) {
-        if (c->network1_get_new_send_buffer[bind_id]) {
-          (*c->network1_get_new_send_buffer[bind_id])(c,bind_id,0);
+        if (cv->buffers[bind_id]==NULL) {
+        if (cv->network1_get_new_send_buffer[bind_id]) {
+          (*cv->network1_get_new_send_buffer[bind_id])(c,bind_id,0);
           }
         }
-      if (c->buffers[bind_id]) {
-        if (c->buflen[bind_id]) {
+      if (cv->buffers[bind_id]) {
+        if (cv->buflen[bind_id]) {
           flag=1;
           } 
         }
@@ -389,19 +389,21 @@ while (1) {
 
 	memset(&clientaddr, 0, sizeof(struct sockaddr_in));
         // Filling server information 
-  int communicator = c->communicator[bind_id];
+  int communicator = cv->communicator[bind_id];
 
         clientaddr.sin_family = AF_INET;
         clientaddr.sin_addr.s_addr = inet_addr(c->ip_addresses_string[bind_id]);
         clientaddr.sin_port = htons(c->sent_to_ports[bind_id]);
 
+      cv->call_rounds[bind_id]=0;  // waiting for read
       int result = sendto(c->sockets[bind_id],c->buffers[bind_id],c->buflen[bind_id],MSG_CONFIRM,(const struct sockaddr *) &clientaddr,
                         sizeof(clientaddr));
       if(result<=0) {
         continue;
         }
-      c->poll_state[bind_id]=4;
-	 
+      cv->poll_state[bind_id]=5;
+      cv->call_rounds[bind_id]=1;
+
       fprintf(stderr," sd %d got out %d of %d from %d to %d\n",bind_id,result,c->buflen[bind_id],c->ports[bind_id],c->sent_to_ports[bind_id]);
       continue;
       }
@@ -473,11 +475,15 @@ while (1) {
       }
     if (flag) {
       cv->poll_state[bind_id]=4;  // waiting for read
+      cv->call_rounds[bind_id]=0;  // waiting for read
       int result = recv(c->sockets[bind_id],c->buffers[bind_id],NETWORK1_MAX_BUFFER_SIZE,MSG_WAITALL);
       fprintf(stderr," rd %d got out %d of %d from %d to %d\n",bind_id,result,c->buflen[bind_id],c->sent_to_ports[bind_id],c->ports[bind_id]);
       if (result==0) {  // end of file
         }
-      else if (result >0) { 
+      else if (result >0) {
+        cv->buflen[bind_id]=result;
+	cv->call_rounds[bind_id]=1;
+	cv->poll_state[bind_id]=5;   
         }
       else {     
         continue;
@@ -499,6 +505,72 @@ return 0;
 
 
 
+  
+void *file_read_thread(void *arg) {
+int bind_id = ((network1_pthread_parameters *) arg)->bind_id;
+volatile struct network1_complete *cv =  ((network1_pthread_parameters *) arg)->c;
+network1_complete *c= (network1_complete *)cv;
+
+cv->call_rounds[bind_id]=0;
+  
+
+while (1) {
+
+     cv->poll_state[bind_id]=3;
+  if ((cv->poll_state[bind_id]==3)||(cv->poll_state[bind_id]==5)) {
+    int flag=0;
+    // assume state is 3 or 5
+    // assume i is not player number
+    // assume there is no timer
+    //if ((c->poll_state[bind_id])==5) {
+    //  fprintf(stderr,"5 wipeout  thtrwrwrw \n");
+    //  c->poll_state[bind_id] = 3;
+    //  c->buflen[bind_id]=0;
+    //  c->buffers[bind_id]=NULL;
+    //  }
+    if (cv->buffers[bind_id]) {
+      if (cv->buflen[bind_id]) {
+        if (cv->network1_get_new_receive_buffer) {
+          (*cv->network1_get_new_receive_buffer)(c,bind_id,0);
+          }
+        }  
+      }
+    else {
+      if (cv->network1_get_new_receive_buffer) {
+        (*cv->network1_get_new_receive_buffer)(c,bind_id,0);
+        }
+      }
+
+
+    if (cv->buffers[bind_id]) {
+      if (!(cv->buflen[bind_id])) {
+        flag=1;
+        }
+      }
+    if (flag) {
+      cv->poll_state[bind_id]=4;  // waiting for read
+      cv->call_rounds[bind_id]=0;
+      int result = read(c->sockets[bind_id],c->buffers[bind_id],NETWORK1_MAX_BUFFER_SIZE);
+      fprintf(stderr," rd %d got out %d of %d from %d to %d\n",bind_id,result,c->buflen[bind_id],c->sent_to_ports[bind_id],c->ports[bind_id]);
+      if (result==0) {  // end of file
+        }
+       else if (result >0) { 
+        cv->call_rounds[bind_id]=1;
+        cv->poll_state[bind_id]=5;  // waiting for read
+        }
+      else {     
+        continue;
+        }
+      continue;
+      }
+    }
+  else {
+    fprintf(stderr,"%d weird state %d\n",bind_id,c->poll_state[bind_id]);
+    }
+  nsleep();
+  }
+return 0;
+}
 
 
 
@@ -520,7 +592,8 @@ c->ports[i]=0;
 memset(&(c->sending_to[i]),0,sizeof(struct sockaddr_in));
 c->sent_to_ports[i]=0;
 memset(&(c->poll_addresses[i]),0,sizeof(struct sockaddr_in));
-
+c->call_rounds[i]=0;
+  
 c->sockets[i]=fd;
 c->pollfds[i]=(struct pollfd){fd:-1,events:POLLIN|POLLPRI|POLLERR,revents:0};
 c->network1_handle_action_round1[i] = network1_handle_action_round1_in;
@@ -531,6 +604,22 @@ c->network1_get_new_send_buffer[i] = NULL;
 c->network1_pull_next_send_buffer_from_queue[i] = NULL;
 
 c->current_number_of_polls++;
+
+{
+int rf = c->current_number_of_polls-1;
+    int ptstatus;
+    fprintf(stderr,"starting char thread %d\n",rf);
+    c->pthread_parameters[rf].bind_id=rf;
+    c->pthread_parameters[rf].c=  (volatile network1_complete *)c;
+    fprintf(stderr,"starting readchar thread %d %lx\n",i,(long unsigned int)  (&(c->pthread_parameters[rf]) ));
+
+    ptstatus = pthread_create(&c->network_thread[rf],NULL,file_read_thread,(void *)(&(c->pthread_parameters[rf])));
+    if (ptstatus) {
+      c->network_thread[rf]=-1;
+      fprintf(stderr,"cant make thread number %d\n",rf);
+      }
+      
+  }
 return i;
 }
 
@@ -574,6 +663,7 @@ gettimeofday(&nowtime,NULL);
 /* set up input ports */
 for (int i=0;i<NUMBER_OF_NETWORK1_PARTICIPANTS;i++) {
   int communicator = i;
+  c->call_rounds[i]=0;
   c->change_buffer_flag[i] = 0;
   c->type[i] = 0; // read from sender
   c->poll_state[i] = 0;
@@ -630,6 +720,7 @@ for (int i=0;i<NUMBER_OF_NETWORK1_PARTICIPANTS;i++) {
 
 for (int o=NUMBER_OF_NETWORK1_PARTICIPANTS;o<NUMBER_OF_NETWORK1_PARTICIPANTS_TIMES_2;o++) {
   int communicator = o-NUMBER_OF_NETWORK1_PARTICIPANTS;
+  c->call_rounds[o]=0;
   c->change_buffer_flag[o] = 0;
   c->type[o] = 1; // read from sender
   c->poll_state[o] = 0;
@@ -700,19 +791,20 @@ Set the socket to nonblocking
   for (int i=0;i<NUMBER_OF_NETWORK1_PARTICIPANTS;i++) {
     int o = i+NUMBER_OF_NETWORK1_PARTICIPANTS;
     int ptstatus;
-    fprintf(stderr,"starting send thread %d\n",o);
-    c->pthread_parameters[o].bind_id=o;
-    c->pthread_parameters[o].c=  (volatile network1_complete *)c;
-    fprintf(stderr,"starting send thread %d %lx\n",i,(long unsigned int)  (&(c->pthread_parameters[o]) ));
+    c->pthread_parameters[i].bind_id=i;
+    c->pthread_parameters[i].c=  (volatile network1_complete *)c;
+    fprintf(stderr,"starting recv thread %d %lx\n",i,(long unsigned int)  (&(c->pthread_parameters[i]) ));
 
     ptstatus = pthread_create(&c->network_thread[i],NULL,network_recv_thread,(void *)(&(c->pthread_parameters[i])));
     if (ptstatus) {
       c->network_thread[i]=-1;
       fprintf(stderr,"cant make thread number %d\n",i);
       }
-    c->pthread_parameters[i].bind_id=i;
-    c->pthread_parameters[i].c=  (volatile network1_complete *)c;
-    fprintf(stderr,"starting send thread %d %lx\n",i,(long unsigned int)  (&(c->pthread_parameters[o]) ));
+      
+      
+    c->pthread_parameters[o].bind_id=o;
+    c->pthread_parameters[o].c=  (volatile network1_complete *)c;
+    fprintf(stderr,"starting send thread %d %lx\n",o,(long unsigned int)  (&(c->pthread_parameters[o]) ));
     ptstatus = pthread_create(&c->network_thread[o],NULL,network_send_thread,(void *) (&(c->pthread_parameters[o]) ));
     if (ptstatus) {
       fprintf(stderr,"cant make receive thread number %d\n",i);
@@ -728,7 +820,133 @@ return 1;
 
 
 
+
+
+
+
+
+
 int network1_poll_check(network1_complete *c) {
+int i;
+volatile network1_complete *cv;
+int number_to_round=0;
+
+for (i=0;i<cv->current_number_of_polls;i++) {
+  if (cv->call_rounds[i]) number_to_round++;
+  }  
+      
+if (!number_to_round) return 0;
+
+{ // Block to process events round 1
+  
+  if (number_to_round &&(cv->network1_action_start_round1)) {
+    (*cv->network1_action_start_round1)(c,number_to_round,number_to_round);
+    }
+    
+  for (int i=0;i<cv->current_number_of_polls;i++) {
+    if (cv->call_rounds[i]) {    
+      if  (cv->network1_handle_action_round1[i]) { (*cv->network1_handle_action_round1[i])(c,i,number_to_round);  }
+      }
+    } /* while loopint through all events */
+  
+  if ((number_to_round) &&(cv->network1_action_finish_round1)) {
+    (*cv->network1_action_finish_round1)(c,number_to_round,number_to_round);
+    }
+
+
+  } // block to process events round 1
+
+
+// recompute number_to_round after round 1
+number_to_round=0;
+for (int i=0;i<cv->current_number_of_polls;i++) {
+  if (cv->call_rounds[i]) number_to_round++;
+  }
+
+//process_poll_buffer_statuses(c,0);  
+
+
+if (!number_to_round) { 
+  goto full_check_poll_loop;
+  }
+  
+
+
+{ // Block to process events round 2
+  
+  if (number_to_round &&(cv->network1_action_start_round2)) {
+    (*cv->network1_action_start_round2)(c,number_to_round,number_to_round);
+    }
+    
+  for (int i=0;i<cv->current_number_of_polls;i++) {
+    if (cv->call_rounds[i]) {    
+      if  (cv->network1_handle_action_round2[i]) { (*cv->network1_handle_action_round2[i])(c,i,number_to_round);  }
+      }
+    } /* while loopint through all events */
+  
+  if ((number_to_round) &&(cv->network1_action_finish_round2)) {
+    (*cv->network1_action_finish_round2)(c,number_to_round,number_to_round);
+    }
+
+
+  } // block to process events round 2
+  
+  
+
+// recompute number_to_round after round 2
+number_to_round=0;
+for (int i=0;i<cv->current_number_of_polls;i++) {
+  if (cv->call_rounds[i]) number_to_round++;
+  }
+//process_poll_buffer_statuses(c,0);  
+
+
+if (!number_to_round) {
+  goto full_check_poll_loop;
+  }
+  
+  
+
+
+{ // Block to process events round 3
+  
+  if (number_to_round &&(cv->network1_action_start_round3)) {
+    (*cv->network1_action_start_round3)(c,number_to_round,number_to_round);
+    }
+    
+  for (int i=0;i<cv->current_number_of_polls;i++) {
+    if (cv->call_rounds[i]) {    
+      if  (cv->network1_handle_action_round3[i]) { (*cv->network1_handle_action_round3[i])(c,i,number_to_round);  }
+      }
+    } /* while loopint through all events */
+  
+  if ((number_to_round) &&(cv->network1_action_finish_round3)) {
+    (*cv->network1_action_finish_round3)(c,number_to_round,number_to_round);
+    }
+
+
+  } // block to process events round 3
+
+
+// recompute number_to_round after round 3 - to use later
+number_to_round=0;
+for (int i=0;i<cv->current_number_of_polls;i++) {
+  if (cv->call_rounds[i]) number_to_round++;
+  }
+//process_poll_buffer_statuses(c,0);  
+
+
+if (!number_to_round) {
+  goto full_check_poll_loop;
+  }
+  
+full_check_poll_loop:
+
+//network1_reset_sendables_and_stuff(c);
+//compute_sendable_recieveables(c,1);
+//process_poll_buffer_statuses(c,0);
+   
+   
 return 0;
 }
 
