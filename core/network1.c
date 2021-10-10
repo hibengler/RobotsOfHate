@@ -3,6 +3,10 @@
 
 
 
+
+
+
+
 // here we gp<
 
 #include "glue.h"
@@ -79,6 +83,153 @@ id	player	sendto		sendport	recvport
 */
 
 
+
+
+
+
+
+           
+  
+static int compute_sendable_recieveable(network1_complete *c,int cm,int nothing) {
+int i=cm;
+  if ((c->poll_state[i+6]) >=6) {
+    c->sendable[i]=0;
+    }
+  if ((c->poll_state[i]) >=6) {
+    c->recieveable[i]=0;
+    }
+  c->responsive[i] = c->sendable[i]  & c->recieveable[i];
+  if ((c->poll_state[i+6]) >=7) {
+    c->countdown[i]=0;
+    }
+  if ((c->poll_state[i]) >=7) {
+    c->countdown[i]=0;
+    }
+  if( (c->poll_state[i+6]) >=8) {
+    c->alive[i]=0;
+    }
+  if (c->poll_state[i] >=8) {
+    c->alive[i]=0;
+    }
+
+return 0;
+}
+
+
+static int compute_sendable_recieveables(network1_complete *c,int nothing) {
+for (int cm=0;cm<6;cm++) {
+  compute_sendable_recieveable(c,cm,0);
+  }
+return 0;
+}
+
+                                                                                                                                                              
+static int process_poll_buffer_status(network1_complete *c,int cm,int compute_statistics_at_end) {
+int communicator =cm;
+int ii=communicator;
+int oo=ii+6;
+compute_statistics_at_end=0; // force it
+if (c->buffers[ii]) {
+  if (c->buflen[ii]) {
+    c->recv_buffer_full[communicator] = 1;
+    c->recv_buffer_missing[communicator] = 0;
+    c->recv_buffer_ready[communicator] = 0;
+    }
+  else { 
+    c->recv_buffer_full[communicator] = 0;
+    c->recv_buffer_missing[communicator] = 0;
+    c->recv_buffer_ready[communicator] = 1;
+    }
+  }
+else {
+  c->recv_buffer_full[communicator] = 0;
+  c->recv_buffer_missing[communicator] = 1;
+  c->recv_buffer_ready[communicator] = 0;
+  }  
+if (compute_statistics_at_end) {
+  if (c->recv_buffer_full[communicator]) {
+    c->recieveable[communicator]=0;
+    }
+  if (c->poll_state[oo]==4) { // if we are state 4
+    c->recieveable[communicator]=1;
+    }
+  else {
+    if (!c->recv_buffer_missing[communicator]) {
+      c->recieveable[communicator]=0;
+      }  
+    }
+  }
+
+
+
+if (c->buffers[oo]) {
+  if (c->buflen[oo]) {
+    c->send_buffer_full[communicator]=1;
+    c->send_buffer_ready [communicator]=0;
+    c->send_buffer_missing[communicator]=0;
+    }
+  else {
+    c->send_buffer_full[communicator]=0;
+    c->send_buffer_ready[communicator]=1;
+    c->send_buffer_missing[communicator]=0;
+    }
+  }
+else {
+  c->send_buffer_full[communicator]=0;
+  c->send_buffer_ready[communicator]=0;
+  c->send_buffer_missing[communicator]=1;
+  }
+
+if (compute_statistics_at_end) {
+  if (c->poll_state[oo]==4)  {
+    if (!c->send_buffer_full[communicator]) {
+      c->sendable[communicator]=0;
+      }
+    }
+  else if (c->poll_state[oo]==3)  {
+    if (c->send_buffer_missing[communicator]) {
+      c->sendable[communicator]=0;
+      }
+    }
+  }
+          
+                                                                                                                                                                              
+return 0;
+}
+
+
+static int process_poll_buffer_statuses(network1_complete *c,int compute_statistics_at_end) {
+for (int i=0;i<6;i++) {
+   process_poll_buffer_status(c,i,compute_statistics_at_end);
+  }
+return 0;
+}
+     
+static int network1_reset_sendable_and_stuff(network1_complete *c,int i) {
+  c->sendable[i]=1;
+  c->recieveable[i]=1;
+  c->responsive[i]=1;
+  c->countdown[i]=1;
+  c->alive[i]=1;
+  return 0;
+}
+  
+/*jj*/
+static int network1_reset_sendables_and_stuff(network1_complete *c) {
+for (int i=0;i<NUMBER_OF_NETWORK1_PARTICIPANTS;i++) {
+  c->sendable[i]=1;
+  c->recieveable[i]=1;
+  c->responsive[i]=1;
+  c->countdown[i]=1;
+  c->alive[i]=1;
+  }  
+  return 0;
+}
+
+
+
+
+
 static void nsleep() {
 struct timespec req;
 req.tv_sec=0;
@@ -130,13 +281,17 @@ if (bind_id>NUMBER_OF_NETWORK1_PARTICIPANTS) {
   // no need to bind sender
   int communicator = cv->communicator[bind_id];
   
-  struct sockaddr_in  * sa = &(c->poll_addresses[bind_id]);
-        memset(sa, 0, sizeof(struct sockaddr_in));	
-        sa->sin_family = AF_INET; // IPv4
-        sa->sin_addr.s_addr = inet_addr(c->ip_addresses_string[communicator]);
-	sa->sin_port = htons(c->ports[communicator]);
+  struct sockaddr_in  sa = c->poll_addresses[bind_id];
+        memset(&sa, 0, sizeof(struct sockaddr_in));	
+        sa.sin_family = AF_INET; // IPv4
+//        sa.sin_addr.s_addr = inet_addr(c->ip_addresses_string[communicator]);
+         sa.sin_addr.s_addr = htonl(INADDR_ANY);
+	sa.sin_port = htons(c->ports[communicator]);
   int s=cv->sockets[bind_id];
-if( bind(s , (struct sockaddr*)&(c->poll_addresses[bind_id]), sizeof(struct sockaddr_in) ) == -1)
+  int rr;
+
+
+if( rr=bind(s , (struct sockaddr*)&sa, sizeof(struct sockaddr_in) ) == -1)
     {
     fprintf(stderr,"error bind1 socket %d id %d port %d\n",s,bind_id,c->ports[bind_id]);
     int e=errno;
@@ -151,13 +306,13 @@ if( bind(s , (struct sockaddr*)&(c->poll_addresses[bind_id]), sizeof(struct sock
     int e=errno;
     if (e) {
       if (e!=11) {
-        fprintf(stderr,"error b2ind socket %d id %d err %d\n",s,bind_id,e);
+        fprintf(stderr,"error2xxx b2ind socket %d id %d err %d\n",s,bind_id,e);
         return(0);
 	}
       }
     }
  fprintf(stderr,"we are good binding socket %d %d\n",c->sockets[bind_id],bind_id);
-   
+
 cv->poll_state[bind_id]=1;
 return 1;
 }
@@ -229,101 +384,6 @@ nanosleep(&ts,NULL);
 
 
 
-#ifdef reader
-  for (int i=0;i<c->current_number_of_polls;i++) {
-    if ((c->type[i]==2)) {
-      if (c->pollfds[i].revents&(POLLIN|POLLPRI)) {
-          int result=read(c->sockets[i],&(c->buffers[i][0]),2047);
-//	  fprintf(stderr,"read2 %lx got %d\n",(long)&(c->buffers[i]),result);
-	  if (result>0) {
-	    c->buflen[i]=result;
-	    c->poll_state[i]=5;
-	    }
-	  else if (result<0) {
-	    int e=nerrno(c,i);
-	    if ((e==EAGAIN)||(e==EWOULDBLOCK)) {
-	      c->poll_state[i]=4;
-              c->pollfds[i].fd=c->sockets[i];
-	      }
-	    }
-          }
-      
-      continue;
-      }
-    else if ((c->type[i]==3)) {
-      continue;
-      }
-
-
-
-
-
-{ // Block to process events round 1
-  
-  if (number_of_events &&(c->network1_action_start_round1)) {
-    (*c->network1_action_start_round1)(c,number_of_events,number_to_round);
-    }
-    
-  
-  if ((number_of_events) &&(c->network1_action_finish_round1)) {
-    (*c->network1_action_finish_round1)(c,number_of_events,number_to_round);
-    }
-
-
-  } // block to process events round 1
-
-
-// recompute number_to_round after round 1
-
-
-
-  
-
-
-{ // Block to process events round 2
-  
-  if (number_of_events &&(c->network1_action_start_round2)) {
-    (*c->network1_action_start_round2)(c,number_of_events,number_to_round);
-    }
-    
-    } /* while loopint through all events */
-  
-  if ((number_of_events) &&(c->network1_action_finish_round2)) {
-    (*c->network1_action_finish_round2)(c,number_of_events,number_to_round);
-    }
-
-
-  } // block to process events round 2
-  
-  
-
-
-  
-  
-
-
-{ // Block to process events round 3
-  
-  if (number_of_events &&(c->network1_action_start_round3)) {
-    (*c->network1_action_start_round3)(c,number_of_events,number_to_round);
-    }
-    
-
-  if ((number_of_events) &&(c->network1_action_finish_round3)) {
-    (*c->network1_action_finish_round3)(c,number_of_events,number_to_round);
-    }
-
-
-  } // block to process events round 3
-
-
-
-return number_to_round;
-}
-
-#endif
-
-
 
 
 
@@ -346,9 +406,14 @@ while (1) {
 //    if (!bind_it(c,bind_id)) {
 //      continue;
 //      }
-  int flag;
-  if ((cv->poll_state[bind_id]==3)||(cv->poll_state[bind_id]==5)) {
-    // assume poll state is 3, or 5.  If 5, well, we reset the buffer
+  int flag=0;
+  if ((cv->poll_state[bind_id]==5)||(cv->poll_state[bind_id]==6)) {
+    if (cv->buflen[bind_id]==0) { // cleared it
+      cv->poll_state[bind_id]=3;  // the poling main thread has finished its work.
+      }
+    }
+  if ((cv->poll_state[bind_id]==3)) {
+    // assume poll state is 3.  5 - have to wait for the other thread
     //assume i is not player number
     // assume thers is no timer
 
@@ -389,26 +454,35 @@ while (1) {
 
 	memset(&clientaddr, 0, sizeof(struct sockaddr_in));
         // Filling server information 
-  int communicator = cv->communicator[bind_id];
+        int communicator = cv->communicator[bind_id];
+        clientaddr=c->sending_to[bind_id];
 
-        clientaddr.sin_family = AF_INET;
-        clientaddr.sin_addr.s_addr = inet_addr(c->ip_addresses_string[bind_id]);
-        clientaddr.sin_port = htons(c->sent_to_ports[bind_id]);
-
-      cv->call_rounds[bind_id]=0;  // waiting for read
+      cv->poll_state[bind_id]=4;
+      cv->call_rounds[bind_id]=0;  // waiting for write
+      
+      fprintf(stderr,"sending from %d to ip %s port %d\n",bind_id,c->ip_addresses_string[communicator],c->sent_to_ports[bind_id]);
+      
       int result = sendto(c->sockets[bind_id],c->buffers[bind_id],c->buflen[bind_id],MSG_CONFIRM,(const struct sockaddr *) &clientaddr,
                         sizeof(clientaddr));
+      fprintf(stderr," sd %d got out %d of %d from %d to %d\n",bind_id,result,c->buflen[bind_id],c->ports[bind_id],c->sent_to_ports[bind_id]);
       if(result<=0) {
+        cv->poll_state[bind_id]=6; // I think
+        cv->call_rounds[bind_id]=1; // have the front end clear this
         continue;
         }
       cv->poll_state[bind_id]=5;
       cv->call_rounds[bind_id]=1;
-
-      fprintf(stderr," sd %d got out %d of %d from %d to %d\n",bind_id,result,c->buflen[bind_id],c->ports[bind_id],c->sent_to_ports[bind_id]);
+      fprintf(stderr,"	job %d it was sent\n",bind_id);
       continue;
       }
     else {
       }
+    }
+  else  if (cv->poll_state[bind_id]==5) {
+    fprintf(stderr,"%d waiting for cleanup %d rds %d\n",bind_id,c->poll_state[bind_id],cv->call_rounds[bind_id]);
+    }
+  else  if (cv->poll_state[bind_id]==6) {
+    fprintf(stderr,"%d waiting for cleanup %d rds %d\n",bind_id,c->poll_state[bind_id],cv->call_rounds[bind_id]);
     }
   else {
     fprintf(stderr,"%d weird state %d\n",bind_id,c->poll_state[bind_id]);
@@ -475,9 +549,17 @@ while (1) {
         }
       }
     if (flag) {
+      int len;
+      struct sockaddr_in  servaddr;
+      servaddr = c->poll_addresses[bind_id];
+	 
       cv->poll_state[bind_id]=4;  // waiting for read
       cv->call_rounds[bind_id]=0;  // waiting for read
-      int result = recv(c->sockets[bind_id],c->buffers[bind_id],NETWORK1_MAX_BUFFER_SIZE,MSG_WAITALL);
+      fprintf(stderr," avout to rd %d got out from %s:%d to %s:%d\n",bind_id,c->ip_addresses_string[bind_id],c->sent_to_ports[bind_id],
+          c->ip_addresses_string[c->participant_number],c->ports[bind_id]);
+      int result = recvfrom(c->sockets[bind_id],c->buffers[bind_id],NETWORK1_MAX_BUFFER_SIZE,MSG_WAITALL,
+         (struct sockaddr *)(&servaddr), &len);
+	 
       fprintf(stderr," rd %d got out %d of %d from %d to %d\n",bind_id,result,c->buflen[bind_id],c->sent_to_ports[bind_id],c->ports[bind_id]);
       if (result==0) {  // end of file
         }
@@ -516,8 +598,10 @@ cv->call_rounds[bind_id]=0;
   
 
 while (1) {
-
+  if ( cv->poll_state[bind_id]<3) {
      cv->poll_state[bind_id]=3;
+     }
+
   if ((cv->poll_state[bind_id]==3)||(cv->poll_state[bind_id]==5)) {
     int flag=0;
     // assume state is 3 or 5
@@ -556,6 +640,7 @@ while (1) {
       if (result==0) {  // end of file
         }
        else if (result >0) { 
+        cv->buflen[bind_id]=result;
         cv->call_rounds[bind_id]=1;
         cv->poll_state[bind_id]=5;  // waiting for read
         }
@@ -614,7 +699,7 @@ int rf = c->current_number_of_polls-1;
     c->pthread_parameters[rf].c=  (volatile network1_complete *)c;
     fprintf(stderr,"starting readchar thread %d %lx\n",rf,(long unsigned int)  (&(c->pthread_parameters[rf]) ));
 
-//    ptstatus = pthread_create(&c->network_thread[rf],NULL,file_read_thread,(void *)(&(c->pthread_parameters[rf])));
+    ptstatus = pthread_create(&c->network_thread[rf],NULL,file_read_thread,(void *)(&(c->pthread_parameters[rf])));
     if (ptstatus) {
       c->network_thread[rf]=-1;
       fprintf(stderr,"cant make thread number %d\n",rf);
@@ -680,9 +765,8 @@ for (int i=0;i<NUMBER_OF_NETWORK1_PARTICIPANTS;i++) {
     memset ((char *)(& inAddr),0, sizeof(struct sockaddr_in));
     inAddr.sin_family = AF_INET;                 /* Internet address family */
 //    fprintf(stderr,"listen %s\n",ips[participant_number]);
-    inAddr.sin_addr.s_addr = inet_addr(ips[participant_number]); /* all inqddr go to me. address is the output address*/
-//    fprintf(stderr,"got %d port %d\n",inAddr.sin_addr.s_addr,c->ports[i]);
-//  inAddr.sin_addr.s_addr = htonl(INADDR_ANY);  -- more indiscriminate
+//    inAddr.sin_addr.s_addr = inet_addr(ips[participant_number],c->ports[i]);
+  inAddr.sin_addr.s_addr = htonl(INADDR_ANY);  // more indiscriminate
     inAddr.sin_port = htons(c->ports[i]);         /* listen to our ip address on the given port */
     c->poll_addresses[i] = inAddr;
     }
@@ -728,7 +812,7 @@ for (int o=NUMBER_OF_NETWORK1_PARTICIPANTS;o<NUMBER_OF_NETWORK1_PARTICIPANTS_TIM
   c->communicator[o] = communicator;  // where we send from
   c->ports[o] = NETWORK1_START_PORT + 36 + c->participant_number * NUMBER_OF_NETWORK1_PARTICIPANTS  + communicator;
   c->sockets[o]=-1;
-//  strncpy[&(c->ip_addresses[o][0]),ips[communicator],19);
+//  strncpy[&(c->ip_addresses_string[o][0]),ips[communicator],19);
 //  c->ip_addresses[o][19]='\0';
 
   {
@@ -795,7 +879,7 @@ Set the socket to nonblocking
     c->pthread_parameters[i].c=  (volatile network1_complete *)c;
     fprintf(stderr,"starting recv thread %d %lx\n",i,(long unsigned int)  (&(c) ));
 
-//    ptstatus = pthread_create(&c->network_thread[i],NULL,network_recv_thread,(void *)(&(c->pthread_parameters[i])));
+    ptstatus = pthread_create(&c->network_thread[i],NULL,network_recv_thread,(void *)(&(c->pthread_parameters[i])));
     if (ptstatus) {
       c->network_thread[i]=-1;
       fprintf(stderr,"cant make thread number %d\n",i);
@@ -805,12 +889,11 @@ Set the socket to nonblocking
     c->pthread_parameters[o].bind_id=o;
     c->pthread_parameters[o].c=  (volatile network1_complete *)c;
     fprintf(stderr,"starting send thread %d %lx\n",o,(long unsigned int)  (&(c->pthread_parameters[o]) ));
- //???   ptstatus = pthread_create(&c->network_thread[o],NULL,network_send_thread,(void *) (&(c->pthread_parameters[o]) ));
+    ptstatus = pthread_create(&c->network_thread[o],NULL,network_send_thread,(void *) (&(c->pthread_parameters[o]) ));
     if (ptstatus) {
       fprintf(stderr,"cant make receive thread number %d\n",o);
       c->network_thread[o]=-1;
       }
-    break;
     }    
   }  
   
@@ -831,12 +914,27 @@ int i;
 volatile network1_complete *cv=c;
 int number_to_round=0;
 
+// call_rounds is used to decide wheteher to call the round1-round3 to externally process messages
+//for (int i=0;i<c->current_number_of_polls;i++) {
+//  c->call_rounds[i]=0;
+//  c->temp_dont_poll_yet[i]=0;
+//  }
+network1_reset_sendables_and_stuff(c);
+
+
+
+compute_sendable_recieveables(c,1);
+process_poll_buffer_statuses(c,0);
+
 
 for (i=0;i<cv->current_number_of_polls;i++) {
   if (cv->call_rounds[i]) number_to_round++;
   }  
       
 if (!number_to_round) return 0;
+
+compute_sendable_recieveables(c,0);
+process_poll_buffer_statuses(c,1);
 
 { // Block to process events round 1
   
@@ -864,7 +962,7 @@ for (int i=0;i<cv->current_number_of_polls;i++) {
   if (cv->call_rounds[i]) number_to_round++;
   }
 
-//process_poll_buffer_statuses(c,0);  
+process_poll_buffer_statuses(c,0);  
 
 
 if (!number_to_round) { 
@@ -899,7 +997,7 @@ number_to_round=0;
 for (int i=0;i<cv->current_number_of_polls;i++) {
   if (cv->call_rounds[i]) number_to_round++;
   }
-//process_poll_buffer_statuses(c,0);  
+process_poll_buffer_statuses(c,0);  
 
 
 if (!number_to_round) {
@@ -934,7 +1032,7 @@ number_to_round=0;
 for (int i=0;i<cv->current_number_of_polls;i++) {
   if (cv->call_rounds[i]) number_to_round++;
   }
-//process_poll_buffer_statuses(c,0);  
+process_poll_buffer_statuses(c,0);  
 
 
 if (!number_to_round) {
@@ -943,11 +1041,11 @@ if (!number_to_round) {
   
 full_check_poll_loop:
 
-//network1_reset_sendables_and_stuff(c);
-//compute_sendable_recieveables(c,1);
-//process_poll_buffer_statuses(c,0);
+network1_reset_sendables_and_stuff(c);
+compute_sendable_recieveables(c,1);
+process_poll_buffer_statuses(c,0);
    
-
+if (!number_to_round) nsleep();
    
 return 0;
 }

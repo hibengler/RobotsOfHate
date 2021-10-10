@@ -29,36 +29,43 @@ char stdin_buffer[50000];
 
 
 void stdin_in1(struct network1_complete *c,int i, int n) {
-if (c->poll_state[i]==5) {
-for (int j=0;j<c->buflen[i];j++) {
+volatile struct network1_complete *cv = (struct network1_complete *)c;
+fprintf(stderr,"stdin_in1 got state %d buflen %d\n",cv->poll_state[i],cv->buflen[i]);
+if (cv->poll_state[i]==5) {
+  for (int j=0;j<cv->buflen[i];j++) {
 
-  int ch = c->buffers[i][j];
-  fprintf(stderr,"%c\n",ch);
-  if ((ch==0) ||(ch == EOF)) {}
-  else if (ch==3) running=0;
-  else if ((ch>='0')&&(ch<'6')) {
-    if ((ch-'0') != c->participant_number) {
-      to_player=ch-'0';
+    int ch = cv->buffers[i][j];
+     fprintf(stderr,"	%c\n",ch);
+    if ((ch==0) ||(ch == EOF)) {}
+    else if (ch==3) running=0;
+    else if ((ch>='0')&&(ch<'6')) {
+      if ((ch-'0') != cv->participant_number) {
+        to_player=ch-'0';
+        }
       }
+    else {
+      char s[4];
+      s[0]=ch;
+      s[1]='\0';
+      strcat(pending_send[to_player],s);
+//      fprintf(stderr,"___pending is %s\n",pending_send[to_player]);
+      } 
     }
-  else {
-    char s[4];
-    s[0]=ch;
-    s[1]='\0';
-    strcat(pending_send[to_player],s);
-    } 
   }
-c->buflen[i]=0;
-c->poll_state[i]=3;
-  }
+cv->buflen[i]=0;
+cv->poll_state[i]=3;
+cv->call_rounds[i]=0;
 }
 
 void stdin_in3(struct network1_complete *c,int i, int n) {
+fprintf(stderr, "stdin_in3\n");
 }
 
 
 
 void do_in1(struct network1_complete *c,int i, int n) {
+volatile struct network1_complete *cv = (struct network1_complete *)c;
+fprintf(stderr,"do_in1 state is %d\b",c->poll_state[i]);
 int communicator = c->communicator[i];
 if (c->poll_state[i]>=6) {
   fprintf(stderr,"xxx");
@@ -69,9 +76,12 @@ else if (c->poll_state[i]==5) {
   if (strlen(received_buffers[communicator])>60) {
     strcpy(received_buffers[communicator], received_buffers[communicator] +strlen(received_buffers[communicator])-60);
     }
-  c->buflen[i]=0;
-  c->poll_state[i]=3;
+  cv->buflen[i]=0;
+  cv->poll_state[i]=3;
   }
+cv->buflen[i]=0;
+cv->poll_state[i]=3;
+cv->call_rounds[i]=0;
 }
 
 
@@ -87,21 +97,24 @@ else if (c->poll_state[i]==5) {
 
 void do_out1(struct network1_complete *c,int i, int n) { 
 fprintf(stderr,"			out1\n\n");
-if (c->poll_state[i]>=6) {
+volatile struct network1_complete *cv = (struct network1_complete *)c;
+
+if (cv->poll_state[i]>=6) {
   fprintf(stderr,"xxx1");
 }
-else if (c->poll_state[i]==5) {
-int communicator = c->communicator[i];
-  c->buffers[i][c->buflen[i]]='\0';
+else if (cv->poll_state[i]==5) {
+int communicator = cv->communicator[i];
+  cv->buffers[i][cv->buflen[i]]='\0';
   strcat(sent_buffers[communicator],c->buffers[i]);
   if (strlen(sent_buffers[communicator])>60) {
     strcpy(sent_buffers[communicator], sent_buffers[communicator] +strlen(sent_buffers[communicator])-60);
     }
   fprintf(stderr,"w");  
-  c->buflen[i]=0;
-  c->buffers[i][c->buflen[i]]='\0';
-  c->poll_state[i]=3;
   }
+cv->buflen[i]=0;
+cv->buffers[i][c->buflen[i]]='\0';
+cv->poll_state[i]=3;
+cv->call_rounds[i]=0;
 }
 
 
@@ -175,14 +188,17 @@ int participant_number = argv[7][0]-'0';
 participant_number = participant_number % 6;
 network1_complete xc;
 network1_complete *c = &xc;
+volatile network1_complete *cv = (volatile network1_complete *)&xc;
+
+
 network1_init(c,participant_number,"255.255.255.255",&(argv[1]),
    NULL,&(do_in1),&(do_out1),NULL,
    NULL,NULL,NULL,NULL,
    NULL,&(do_in3),&(do_out3),NULL,
     NULL,NULL,NULL);
 
-int r=fcntl(fileno(stdin),F_SETFL,O_NONBLOCK);
-fprintf(stderr,"fcntl r is %d\n",r);
+//int r=fcntl(fileno(stdin),F_SETFL,O_NONBLOCK);
+//fprintf(stderr,"fcntl r is %d\n",r);
 int stdin_port = network1_add_standard_input_fd(c,fileno(stdin),&(stdin_in1),NULL,&(stdin_in3),NULL);
 
 /*
@@ -207,30 +223,35 @@ for (int i=0;i<6;i++) {
   }          
 
 stdin_buffer[0]='\0';
-c->buffers[stdin_port] = stdin_buffer;
-c->buflen[stdin_port] = 0;
+cv->buflen[stdin_port] = 0;
+cv->buffers[stdin_port] = stdin_buffer;
 
-      
 to_player = (participant_number+1)%6;
 while (running) {
-    fprintf(stderr,"polling for player %d    state  %d  send_buffer_ready %d\n",to_player,c->poll_state[6+to_player],c->send_buffer_ready[to_player]);
-    if ( (c->poll_state[6+to_player] <=3)&& (c->send_buffer_ready[to_player]))  {
+//    fprintf(stderr,"polling for player %d    outstate  %d  send_buffer_ready %d\n",to_player,c->poll_state[6+to_player],c->send_buffer_ready[to_player]);
+    if (cv->poll_state[6+to_player] ==5) { // waiting for us to clear the sent
+      cv->buflen[6+to_player]=0; // clear it
+      cv->poll_state[6+to_player]=3;
+      }
+    if ( (cv->poll_state[6+to_player] ==3)&& (cv->send_buffer_ready[to_player]))  {
        int l=strlen(pending_send[to_player]);
+//       fprintf(stderr,"add %d\n",l);
        if (l) {
          strcat(convo_buffers[to_player],pending_send[to_player]);
          if (strlen(convo_buffers[to_player])>60) {
            strcpy(convo_buffers[to_player], convo_buffers[to_player] +strlen(convo_buffers[to_player])-60);
            }
-         if (c->poll_state[6+to_player] ==5) {
-	    c->poll_state[6+to_player]=3;
-	    c->buflen[6+to_player]=0;
-	    }
-         strcat(c->buffers[6+to_player],pending_send[to_player]);
-	 c->buflen[6+to_player] +=l;
-	
-	 pending_send[to_player][0]='\0';
-	 fprintf(stderr,"pending send filled len %d\n", c->buflen[6+to_player]);
+	 if(cv->buflen[6+to_player]==0) { // not waiting for a send
+           strcat(cv->buffers[6+to_player],pending_send[to_player]);
+	   cv->buflen[6+to_player] = strlen(cv->buffers[6+to_player]);
+   	   pending_send[to_player][0]='\0';
+ // 	   fprintf(stderr,"pending send filled len %d\n", c->buflen[6+to_player]);
+	   }
+	 else {
+  	   fprintf(stderr,"pending send waiting for packet to be sent, len %d\n", c->buflen[6+to_player]);
+	   }
 	 }
+       
        } // if we can send
     
 //  fprintf(stderr,"poll check\n");
@@ -244,7 +265,7 @@ while (running) {
        {
         struct timespec thislong;
              thislong.tv_sec = 0;
-             thislong.tv_nsec = 50000000; /* 50 milliseconds */
+             thislong.tv_nsec = 5000000; /* 5 milliseconds */
 
              nanosleep(&thislong, &thislong);
       }
