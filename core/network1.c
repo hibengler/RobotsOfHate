@@ -468,10 +468,17 @@ while (1) {
       if(result<=0) {
         cv->poll_state[bind_id]=6; // I think
         cv->call_rounds[bind_id]=1; // have the front end clear this
+        if  (cv->network1_handle_action_round1[bind_id]) { (*cv->network1_handle_action_round1[bind_id])(c,bind_id,1);  }
+        if  (cv->network1_handle_action_round2[bind_id]) { (*cv->network1_handle_action_round2[bind_id])(c,bind_id,1);  }
+        if  (cv->network1_handle_action_round3[bind_id]) { (*cv->network1_handle_action_round3[bind_id])(c,bind_id,1);  }
+	
         continue;
         }
       cv->poll_state[bind_id]=5;
       cv->call_rounds[bind_id]=1;
+      if  (cv->network1_handle_action_round1[bind_id]) { (*cv->network1_handle_action_round1[bind_id])(c,bind_id,1);  }
+      if  (cv->network1_handle_action_round2[bind_id]) { (*cv->network1_handle_action_round2[bind_id])(c,bind_id,1);  }
+      if  (cv->network1_handle_action_round3[bind_id]) { (*cv->network1_handle_action_round3[bind_id])(c,bind_id,1);  }
       fprintf(stderr,"	job %d it was sent\n",bind_id);
       continue;
       }
@@ -567,6 +574,10 @@ while (1) {
         cv->buflen[bind_id]=result;
 	cv->call_rounds[bind_id]=1;
 	cv->poll_state[bind_id]=5;   
+        if  (cv->network1_handle_action_round1[bind_id]) { (*cv->network1_handle_action_round1[bind_id])(c,bind_id,1);  }
+        if  (cv->network1_handle_action_round2[bind_id]) { (*cv->network1_handle_action_round2[bind_id])(c,bind_id,1);  }
+        if  (cv->network1_handle_action_round3[bind_id]) { (*cv->network1_handle_action_round3[bind_id])(c,bind_id,1);  }
+	
         }
       else {     
         continue;
@@ -662,9 +673,9 @@ return 0;
 
 /* call after network1_init to add a file or non udp socket port */
 int network1_add_standard_input_fd(network1_complete *c,int fd,  
-     network1_complete_round_call network1_handle_action_round1_in,  
-     network1_complete_round_call network1_handle_action_round2_in,
-     network1_complete_round_call network1_handle_action_round3_in,   
+     network1_complete_round_call network1_handle_action_round1_in_poll,  
+     network1_complete_round_call network1_handle_action_round2_in_poll,
+     network1_complete_round_call network1_handle_action_round3_in_poll,   
      network1_complete_round_call network1_get_new_receive_buffer) {
 int i=  c->current_number_of_polls;
 c->buflen[i]=0;
@@ -682,9 +693,9 @@ c->call_rounds[i]=0;
   
 c->sockets[i]=fd;
 c->pollfds[i]=(struct pollfd){fd:-1,events:POLLIN|POLLPRI|POLLERR,revents:0};
-c->network1_handle_action_round1[i] = network1_handle_action_round1_in;
-c->network1_handle_action_round2[i] = network1_handle_action_round2_in;
-c->network1_handle_action_round3[i] = network1_handle_action_round3_in;
+c->network1_handle_action_round1_poll[i] = network1_handle_action_round1_in_poll;
+c->network1_handle_action_round2_poll[i] = network1_handle_action_round2_in_poll;
+c->network1_handle_action_round3_poll[i] = network1_handle_action_round3_in_poll;
 c->network1_get_new_receive_buffer[i] = network1_get_new_receive_buffer;
 c->network1_get_new_send_buffer[i] = NULL;
 c->network1_pull_next_send_buffer_from_queue[i] = NULL;
@@ -714,15 +725,21 @@ return i;
 
 
 int network1_init (network1_complete *c,int participant_number,char *broadcast_ip,char *ips[],
-     network1_complete_round_call network1_action_start_round1,
+     network1_complete_round_call network1_action_start_round1_poll,
+     network1_complete_round_call network1_handle_action_round1_in_poll, 
+     network1_complete_round_call network1_handle_action_round1_out_poll,
+     network1_complete_round_call network1_action_finish_round1_poll,
+     network1_complete_round_call network1_action_start_round2_poll,
+     network1_complete_round_call network1_handle_action_round2_in_poll, 
+     network1_complete_round_call network1_handle_action_round2_out_poll,
+     network1_complete_round_call network1_action_finish_round2_poll,
+     network1_complete_round_call network1_action_start_round3_poll,
+     network1_complete_round_call network1_handle_action_round3_in_poll, 
+     network1_complete_round_call network1_handle_action_round3_out_poll,
+     network1_complete_round_call network1_action_finish_round3_poll,
      network1_complete_round_call network1_handle_action_round1_in, network1_complete_round_call network1_handle_action_round1_out,
-     network1_complete_round_call network1_action_finish_round1,
-     network1_complete_round_call network1_action_start_round2,
      network1_complete_round_call network1_handle_action_round2_in, network1_complete_round_call network1_handle_action_round2_out,
-     network1_complete_round_call network1_action_finish_round2,
-     network1_complete_round_call network1_action_start_round3,
      network1_complete_round_call network1_handle_action_round3_in, network1_complete_round_call network1_handle_action_round3_out,
-     network1_complete_round_call network1_action_finish_round3,
      network1_complete_round_call network1_get_new_receive_buffer, /* get a new receive buffer for this poll - could be broadcast in */                                       
      network1_complete_round_call network1_get_new_send_buffer, /* get a new send buffer - 0 length  - just to fill up  - why? */                                 
      network1_complete_round_call network1_pull_next_send_buffer_from_queue /* get a semd buffer off the queue for this polling address - returns queue length */          
@@ -734,12 +751,12 @@ memset(c,0,sizeof(network1_complete));
 
 c->current_number_of_polls=NUMBER_OF_NETWORK1_PARTICIPANTS_TIMES_2;
 
-c->network1_action_start_round1 = network1_action_start_round1;
-c->network1_action_finish_round1 = network1_action_finish_round1;
-c->network1_action_start_round2 = network1_action_start_round2;
-c->network1_action_finish_round2 = network1_action_finish_round2;
-c->network1_action_start_round3 = network1_action_start_round3;
-c->network1_action_finish_round3 = network1_action_finish_round3;
+c->network1_action_start_round1_poll = network1_action_start_round1_poll;
+c->network1_action_finish_round1_poll = network1_action_finish_round1_poll;
+c->network1_action_start_round2_poll = network1_action_start_round2_poll;
+c->network1_action_finish_round2_poll = network1_action_finish_round2_poll;
+c->network1_action_start_round3_poll = network1_action_start_round3_poll;
+c->network1_action_finish_round3_poll = network1_action_finish_round3_poll;
 
 
 c->participant_number = participant_number;
@@ -796,6 +813,9 @@ for (int i=0;i<NUMBER_OF_NETWORK1_PARTICIPANTS;i++) {
   c->buflen[i]= 0;
   c->buffers[i]= NULL;
     
+  c->network1_handle_action_round1_poll[i] = network1_handle_action_round1_in_poll;
+  c->network1_handle_action_round2_poll[i] = network1_handle_action_round2_in_poll;
+  c->network1_handle_action_round3_poll[i] = network1_handle_action_round3_in_poll;
   c->network1_handle_action_round1[i] = network1_handle_action_round1_in;
   c->network1_handle_action_round2[i] = network1_handle_action_round2_in;
   c->network1_handle_action_round3[i] = network1_handle_action_round3_in;
@@ -844,6 +864,9 @@ for (int o=NUMBER_OF_NETWORK1_PARTICIPANTS;o<NUMBER_OF_NETWORK1_PARTICIPANTS_TIM
   c->buffers[o]= NULL;
     
   
+  c->network1_handle_action_round1_poll[o] = network1_handle_action_round1_out_poll;
+  c->network1_handle_action_round2_poll[o] = network1_handle_action_round2_out_poll;
+  c->network1_handle_action_round3_poll[o] = network1_handle_action_round3_out_poll;
   c->network1_handle_action_round1[o] = network1_handle_action_round1_out;
   c->network1_handle_action_round2[o] = network1_handle_action_round2_out;
   c->network1_handle_action_round3[o] = network1_handle_action_round3_out;
@@ -938,18 +961,18 @@ process_poll_buffer_statuses(c,1);
 
 { // Block to process events round 1
   
-  if (number_to_round &&(cv->network1_action_start_round1)) {
-    (*cv->network1_action_start_round1)(c,number_to_round,number_to_round);
+  if (number_to_round &&(cv->network1_action_start_round1_poll)) {
+    (*cv->network1_action_start_round1_poll)(c,number_to_round,number_to_round);
     }
     
   for (int i=0;i<cv->current_number_of_polls;i++) {
     if (cv->call_rounds[i]) {    
-      if  (cv->network1_handle_action_round1[i]) { (*cv->network1_handle_action_round1[i])(c,i,number_to_round);  }
+      if  (cv->network1_handle_action_round1_poll[i]) { (*cv->network1_handle_action_round1_poll[i])(c,i,number_to_round);  }
       }
     } /* while loopint through all events */
   
-  if ((number_to_round) &&(cv->network1_action_finish_round1)) {
-    (*cv->network1_action_finish_round1)(c,number_to_round,number_to_round);
+  if ((number_to_round) &&(cv->network1_action_finish_round1_poll)) {
+    (*cv->network1_action_finish_round1_poll)(c,number_to_round,number_to_round);
     }
 
 
@@ -972,19 +995,19 @@ if (!number_to_round) {
 
 
 { // Block to process events round 2
-  
-  if (number_to_round &&(cv->network1_action_start_round2)) {
-    (*cv->network1_action_start_round2)(c,number_to_round,number_to_round);
+
+  if (number_to_round &&(cv->network1_action_start_round2_poll)) {
+    (*cv->network1_action_start_round2_poll)(c,number_to_round,number_to_round);
     }
     
   for (int i=0;i<cv->current_number_of_polls;i++) {
     if (cv->call_rounds[i]) {    
-      if  (cv->network1_handle_action_round2[i]) { (*cv->network1_handle_action_round2[i])(c,i,number_to_round);  }
+      if  (cv->network1_handle_action_round2_poll[i]) { (*cv->network1_handle_action_round2_poll[i])(c,i,number_to_round);  }
       }
     } /* while loopint through all events */
   
-  if ((number_to_round) &&(cv->network1_action_finish_round2)) {
-    (*cv->network1_action_finish_round2)(c,number_to_round,number_to_round);
+  if ((number_to_round) &&(cv->network1_action_finish_round2_poll)) {
+    (*cv->network1_action_finish_round2_poll)(c,number_to_round,number_to_round);
     }
 
 
@@ -1009,18 +1032,18 @@ if (!number_to_round) {
 
 { // Block to process events round 3
   
-  if (number_to_round &&(cv->network1_action_start_round3)) {
-    (*cv->network1_action_start_round3)(c,number_to_round,number_to_round);
+  if (number_to_round &&(cv->network1_action_start_round3_poll)) {
+    (*cv->network1_action_start_round3_poll)(c,number_to_round,number_to_round);
     }
     
   for (int i=0;i<cv->current_number_of_polls;i++) {
     if (cv->call_rounds[i]) {    
-      if  (cv->network1_handle_action_round3[i]) { (*cv->network1_handle_action_round3[i])(c,i,number_to_round);  }
+      if  (cv->network1_handle_action_round3_poll[i]) { (*cv->network1_handle_action_round3_poll[i])(c,i,number_to_round);  }
       }
     } /* while loopint through all events */
   
-  if ((number_to_round) &&(cv->network1_action_finish_round3)) {
-    (*cv->network1_action_finish_round3)(c,number_to_round,number_to_round);
+  if ((number_to_round) &&(cv->network1_action_finish_round3_poll)) {
+    (*cv->network1_action_finish_round3_poll)(c,number_to_round,number_to_round);
     }
 
 

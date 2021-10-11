@@ -4,7 +4,7 @@
 #ifndef NETWORK1_H 
 #define NETWORK1_H 1
 
-
+#include <pthread.h>
 #include <sys/poll.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -154,22 +154,29 @@ networjk_attempt_send needs it full
   struct pollfd pollfds[MAX_NUMBER_OF_POLLS];
 
   
-  network1_complete_round_call network1_action_start_round1; /* we are to start a round */
   network1_complete_round_call network1_handle_action_round1[MAX_NUMBER_OF_POLLS]; /* action right after got a packet */
-  network1_complete_round_call network1_action_finish_round1; /* we are to finish a round */
-  
-  network1_complete_round_call network1_action_start_round2; /* we are to start a round */
   network1_complete_round_call network1_handle_action_round2[MAX_NUMBER_OF_POLLS]; /* action after first set complete run */
-  network1_complete_round_call network1_action_finish_round2; /* we are to finish a round */
-  
-  network1_complete_round_call network1_action_start_round3; /* we are to start a round */
   network1_complete_round_call network1_handle_action_round3[MAX_NUMBER_OF_POLLS]; /* action after first set complete run */
-  network1_complete_round_call network1_action_finish_round3; /* we are to finish a round */
   
   network1_complete_round_call network1_get_new_receive_buffer[MAX_NUMBER_OF_POLLS]; /* get a new receive buffer for this poll -  */
   network1_complete_round_call network1_get_new_send_buffer[MAX_NUMBER_OF_POLLS]; /* get a new send buffer - 0 length  - just to fill up  - why? */
   network1_complete_round_call network1_pull_next_send_buffer_from_queue[MAX_NUMBER_OF_POLLS]; /* get a semd buffer off the queue for this polling address - returns queue length somehow */
+
+  /* the above callbacks are in the reader/writer threads.  The below calls are done by the poll thread */
+    
+      
+  network1_complete_round_call network1_action_start_round1_poll; /* we are to start a round */
+  network1_complete_round_call network1_handle_action_round1_poll[MAX_NUMBER_OF_POLLS]; /* action right after got a packet */
+  network1_complete_round_call network1_action_finish_round1_poll; /* we are to finish a round */
   
+  network1_complete_round_call network1_action_start_round2_poll; /* we are to start a round */
+  network1_complete_round_call network1_handle_action_round2_poll[MAX_NUMBER_OF_POLLS]; /* action after first set complete run */
+  network1_complete_round_call network1_action_finish_round2_poll; /* we are to finish a round */
+  
+  network1_complete_round_call network1_action_start_round3_poll; /* we are to start a round */
+  network1_complete_round_call network1_handle_action_round3_poll[MAX_NUMBER_OF_POLLS]; /* action after first set complete run */
+  network1_complete_round_call network1_action_finish_round3_poll; /* we are to finish a round */
+	  
 } network1_complete;
 
 
@@ -184,15 +191,18 @@ No network calls are run, but evetything is structures
 This can be adjusted after the fact-- in the smae thread
 */
 extern int network1_init (network1_complete *c,int participant_number,char *broadcast_ip,char *ips[],
-     network1_complete_round_call network1_action_start_round1,
+     network1_complete_round_call network1_action_start_round1_poll,
+     network1_complete_round_call network1_handle_action_round1_in_poll, network1_complete_round_call network1_handle_action_round1_out_poll,
+     network1_complete_round_call network1_action_end_round1_poll,
+     network1_complete_round_call network1_action_start_round2_poll,
+     network1_complete_round_call network1_handle_action_round2_in_poll, network1_complete_round_call network1_handle_action_round2_out_poll,
+     network1_complete_round_call network1_action_end_round2_poll,
+     network1_complete_round_call network1_action_start_round3_poll,
+     network1_complete_round_call network1_handle_action_round3_in_poll, network1_complete_round_call network1_handle_action_round3_out_poll,
+     network1_complete_round_call network1_action_end_round3_poll,
      network1_complete_round_call network1_handle_action_round1_in, network1_complete_round_call network1_handle_action_round1_out,
-     network1_complete_round_call network1_action_end_round1,
-     network1_complete_round_call network1_action_start_round2,
      network1_complete_round_call network1_handle_action_round2_in, network1_complete_round_call network1_handle_action_round2_out,
-     network1_complete_round_call network1_action_end_round2,
-     network1_complete_round_call network1_action_start_round3,
      network1_complete_round_call network1_handle_action_round3_in, network1_complete_round_call network1_handle_action_round3_out,
-     network1_complete_round_call network1_action_end_round3,
      network1_complete_round_call network1_get_new_receive_buffer, /* get a new receive buffer for this poll - could be broadcast in */
      network1_complete_round_call network1_get_new_send_buffer, /* get a new send buffer - 0 length  - just to fill up  - why? */
      network1_complete_round_call network1_pull_next_send_buffer_from_queue /* get a semd buffer off the queue for this polling address - returns queue length */
@@ -224,9 +234,9 @@ extern int network1_set_buffer(network1_complete *c,int bind_id,char *buffer, in
 
           
 extern int network1_add_standard_input_fd(network1_complete *c,int fd,
-     network1_complete_round_call network1_handle_action_round1_in,
-     network1_complete_round_call network1_handle_action_round2_in,
-     network1_complete_round_call network1_handle_action_round3_in,
+     network1_complete_round_call network1_handle_action_round1_in_poll,
+     network1_complete_round_call network1_handle_action_round2_in_poll,
+     network1_complete_round_call network1_handle_action_round3_in_poll,
      network1_complete_round_call network1_get_new_receive_buffer);
 
 int rehearse_network(network1_complete *c);  /* find the other ones */

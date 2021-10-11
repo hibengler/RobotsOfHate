@@ -1,4 +1,4 @@
-
+/* junk - use network2.h
 /*
 Packets are from, to
 we have 6 froms, and 6 tos

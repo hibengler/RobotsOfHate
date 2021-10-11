@@ -195,6 +195,8 @@ network1_init(c,participant_number,"255.255.255.255",&(argv[1]),
    NULL,&(do_in1),&(do_out1),NULL,
    NULL,NULL,NULL,NULL,
    NULL,&(do_in3),&(do_out3),NULL,
+   NULL,NULL,NULL,
+   NULL,NULL,NULL,
     NULL,NULL,NULL);
 
 //int r=fcntl(fileno(stdin),F_SETFL,O_NONBLOCK);
