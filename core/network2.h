@@ -9,95 +9,83 @@
     
 struct network2_complete;	    
   
+  
+/* There are commands from too - something not c */
 
+  
+/* read in 0 6 12 18 24 30 - queue by thread for read thread
+
+  For write -> write 36 queues from read to write
+  
+read - 256 packets - 6
+
+  read -> received[a]=1
+  read -> packert.acknowledged[a] |=1
+    if acknowledged changed
+      queue to write[a+1]  
+      
+    
+*/      
+
+
+#define NETWORK2_HIGHEST_COMMAND 5
+#define NETWORK2_COMMAND_FULL_LENGTH 2048
+#define NETWORK2_COMMAND_MAX_LENGTH 1400
+// ^ mtu size pluss ctrld at start
+
+
+#define NETWORK2_NUMBER_COMMANDS 256  
+#define NETWORK2_STATE_LENGTH 18
 #define NETWORK2_QUEUE_SIZE 20
-#define NETWORK2_QUEUE_LEN 2048
-typedef struct network2_buffer_queue {
+#define NETWORK2_LEN 2048
+
+
+typedef struct network2_queue {
 int head;
 int tail;
-unsigned char buffer[NETWORK2_QUEUE_SIZE][NETWORK2_QUEUE_LEN];
-} network2_buffer_queue;
+unsigned short command_id[NETWORK2_QUEUE_SIZE];
+unsigned char command_code[NETWORK2_QUEUE_SIZE];
+unsigned char state_number[NETWORK2_QUEUE_SIZE];
+} network2_queue;
 
 
+/* each sent packet is a command here
+Start with round robin
+
+
+A coded network command is 
+ctrl-c lengthlo lengthhi 
+
+ctrl-c lengthlo lengthhi idlo idhi sendist send2nd send3rd send4 send5 send6 state characters...
+ctrl-a lengthlo lengthhi idlo idhi state extra - in ack
+ctrl-b lengthlo lengthhi string -- simple string
+ctrl-e lengthlo lengthhi idlo idhi  ask for the command 
+ctrl-\ null - done
+
+If different character - assume person to person command - and just execute it
+
+
+ctrlc - we send our first recird 
+ctrlc l0 lhi cmdlo cmdhi 6 0 0 1 2 3 4 5 1 hello
+*/
 typedef void (*network2_complete_round_call)(struct network2_complete *,int,int);
 
-typedef struct network2_hate_rps { // rock, paper,scissors
-float rps[3];
-} hate_rps;
 
-typedef struct network2_hate_robot {
-  uchar mode; // attack, defend, neutral
-  uchar current_planet;
-  uchar destination_planet;
-  uchar position;  // position to destination, if on destination, that planet controlls the batt
-  hate_rps strength;
-  } network2_hate_robot;
-	  
-
-typedef struct network2_hate_planet {
-  uchar mode; // disconnected, playing, lobby
-  uchar player_id; /* 0-5 */
-  struct network2_hate_robot robots[HATE_NUMBER_ROBOTS];
-  } network2_hate_player;
-      
-typedef struct network2_hate_player {  // players from a network2 point of view.
-  uchar mode; // disconnected, playing, lobby
-  uchar player_id; /* 0-5 */
-  } network2_hate_player;
-      
-
-struct network2_hate_planet_scene { // part of the info for the hate scene - each planet is statted out
-unsigned int global_frame;
-unsigned int player_frame;
-unsigned int local_frame;
-unsigned char broadcast_count; /* 0 - original, 1 - 1 frame away, 2 - 2 frame away, 3 - 3 frame away, etc */
-unsigned char from_player;
-unsigned char to1;
-unsigned char to2;
-unsigned char to3;
-unsigned char seenby;
-network2_hate_planet planet;
-} network2_hate_player_scene;
+typedef struct network2_internal_command {
+unsigned short length; // length of actual command text
+unsigned short id;
+unsigned char code; // command
+unsigned char network_order[NUMBER_OF_NETWORK1_PARTICIPANTS];
+unsigned char sent_state[NUMBER_OF_NETWORK1_PARTICIPANTS]; // send sets this after try to send to. receive sets this after received from
+unsigned char acknowledged_state[NUMBER_OF_NETWORK1_PARTICIPANTS]; // recv sets this when recevied state
+unsigned char executed_state[NUMBER_OF_NETWORK1_PARTICIPANTS]; // recv sets this when recevied state
+unsigned char clear_state[NUMBER_OF_NETWORK1_PARTICIPANTS]; // send sets whis when attempt to clear out
+unsigned char did_states[NETWORK2_STATE_LENGTH];
+} network2_internal_command;
 
 
-
-
-typedef struct network2_hate_scene { 
-unsigned short lenth;
-unsigned char type; /* s - scene */
-unsigned int global_frame;
-unsigned int player_frame;
-unsigned int local_frame;
-unsigned char broadcast_count; /* 0 - original, 1 - 1 frame away, 2 - 2 frame away, 3 - 3 frame away, etc -1, not useful */
-unsigned char to1;
-unsigned char to2;
-unsigned char to3;
-unsigned char seenby;
-network2_hate_player players[NUMBER_OF_NETWORK1_PARTICIPANTS];
-network2_hate_planet_scene scenes[NUMBER_OF_NETWORK1_PARTICIPANTS];
-} network2_hate_scene;
-
-
-
-typedef struct network2_command {
-unsigned short lenth;
-unsigned char type; /* c - command */
-unsigned char extra; 
-unsigned int global_frame;
-unsigned int player_frame;
-unsigned int local_frame;
-unsigned char broadcast_count; /* 0 - original, 1 - 1 frame away, 2 - 2 frame away, 3 - 3 frame away, etc -1, not useful */
-unsigned char to1;
-unsigned char to2;
-unsigned char to3;
-unsigned char seenby;
-unsigned char completeby;
-} network2_command_status;
-
-
-typedef struct network2_command_status {
-
-} network2_command_status;
+/* we will have standard send and receive that trumps the other send and receive one time
+so if the standard send and receive is filled in, we do that, otherwise, we go through execute, then 0-5 receive actions */
 
 
 typedef struct network2_complete {
@@ -105,39 +93,85 @@ typedef struct network2_complete {
   network1_complete *c1;
   volatile network1_complete *cv1;
   int call_rounds[MAX_NUMBER_OF_POLLS];
+
+  int next_command_id[NUMBER_OF_NETWORK1_PARTICIPANTS];  
+  int buflen[MAX_NUMBER_OF_POLLS]; // should work the same
+  char *buffers[MAX_NUMBER_OF_POLLS]; // send it  or receive it - ctrl b or normal just add send quick. set the state as per for polling
+  int send_buffer_ready[MAX_NUMBER_OF_POLLS];   // managed by player12
+  int temp_dont_poll_yet[MAX_NUMBER_OF_POLLS];  // send - set to 5 when done. wait till buflen is non 0 poll state 3
+  						// receive - one at a time to be executed.
+						// but could receive many at once - well, I guess  is per each in thread.
+						// so after stdin_in1,we can call it right again?
+  int poll_state[MAX_NUMBER_OF_POLLS];       // pulled from network1 poll state/ except we can add and modify this one also
+  int participant_number;                   // pulled from network1->participant_nmbver
+  int communicator[MAX_NUMBER_OF_POLLS];    // pulled from network1->communicatore
     
   int number_of_active_players;
-  network2_buffer_queue receive_queues[NUMBER_OF_NETWORK1_PARTICIPANTS];
-  unsigned char player_is_active[NUMBER_OF_NETWORK1_PARTICIPANTS];  
-  struct network2_hate_scene hate_scenes[NUMBER_OF_NETWORK1_PARTICIPANTS];
-  struct network2_hate_scene previous_hate_scene; /* built by averaging the others, controls the display somewhat */
-  struct network2_hate_scene latest_hate_scene; /* built by averaging the others, controls the display somewhat */
+
+  network2_internal_command internal_commands[NETWORK2_NUMBER_COMMANDS];
+  unsigned char internal_command_buffers[NETWORK2_NUMBER_COMMANDS][NETWORK2_COMMAND_FULL_LENGTH];
+
+  network2_queue queues_from_poll_to_send[NUMBER_OF_NETWORK1_PARTICIPANTS_TIMES_2][NUMBER_OF_NETWORK1_PARTICIPANTS_TIMES_2];  //send reads each one - the receive thread that
+  // is the same as the current player -- that is the queu used by the poll process.  and the buffer,buflen, and state is used by any thread at level 2.
+  // level1 is built up by the send stuff
+  char internal_buffer[MAX_NUMBER_OF_POLLS][NETWORK2_COMMAND_FULL_LENGTH]; // these point to network1 buffers and polls - except maybe the read characters
+  char internal_position[MAX_NUMBER_OF_POLLS]; // internal position - essentially buflen when sending, and next position to read from when receivieng
+
+
+
+  network2_complete_round_call network2_handle_action_round1[MAX_NUMBER_OF_POLLS]; /* action right after got a packet */
+  network2_complete_round_call network2_handle_action_round2[MAX_NUMBER_OF_POLLS]; /* action after first set complete run */
+  network2_complete_round_call network2_handle_action_round3[MAX_NUMBER_OF_POLLS]; /* action after first set complete run */
+
+  network2_complete_round_call network2_get_new_receive_buffer[MAX_NUMBER_OF_POLLS]; /* get a new receive buffer for this poll -  */
+  network2_complete_round_call network2_get_new_send_buffer[MAX_NUMBER_OF_POLLS]; /* get a new send buffer - 0 length  - just to fill up  - why? */
+  network2_complete_round_call network2_pull_next_send_buffer_from_queue[MAX_NUMBER_OF_POLLS]; /* get a semd buffer off the queue for this polling address - returns queue length somehow */
+
+  /* the above callbacks are in the reader/writer threads.  The below calls are done by the poll thread */
+
+
+  network2_complete_round_call network2_action_start_round1_poll; /* we are to start a round */
+  network2_complete_round_call network2_handle_action_round1_poll[MAX_NUMBER_OF_POLLS]; /* action right after got a packet */
+  network2_complete_round_call network2_action_finish_round1_poll; /* we are to finish a round */
+
+  network2_complete_round_call network2_action_start_round2_poll; /* we are to start a round */
+  network2_complete_round_call network2_handle_action_round2_poll[MAX_NUMBER_OF_POLLS]; /* action after first set complete run */
+  network2_complete_round_call network2_action_finish_round2_poll; /* we are to finish a round */
+
+  network2_complete_round_call network2_action_start_round3_poll; /* we are to start a round */
+  network2_complete_round_call network2_handle_action_round3_poll[MAX_NUMBER_OF_POLLS]; /* action after first set complete run */
+  network2_complete_round_call network2_action_finish_round3_poll; /* we are to finish a round */
+
+  
+  
  } network2_complete;
 
 
 
 
 
-/* this initializes the network1_complete structure - so it is set up to start going.
+/* this initializes the network2_complete structure - so it is set up to start going.
 No network calls are run, but evetything is structures 
 
 This can be adjusted after the fact-- in the smae thread
 */
-extern int network2_init (network2_complete *c,int participant_number,char *broadcast_ip,char *ips[],
-     network2_complete_round_call network2_action_start_round1,
-     network2_complete_round_call network2_handle_action_round1_in, network2_complete_round_call network2_handle_action_round1_out,
-     network2_complete_round_call network2_action_end_round1,
-     network2_complete_round_call network2_action_start_round2,
-     network2_complete_round_call network2_handle_action_round2_in, network2_complete_round_call network2_handle_action_round2_out,
-     network2_complete_round_call network2_action_end_round2,
-     network2_complete_round_call network2_action_start_round3,
-     network2_complete_round_call network2_handle_action_round3_in, network2_complete_round_call network2_handle_action_round3_out,
-     network2_complete_round_call network2_action_end_round3,
+extern int network2_init (network2_complete *c2,int participant_number,char *broadcast_ip,char *ips[],
+     network2_complete_round_call network2_action_start_round1_poll,
+     network2_complete_round_call network2_handle_action_round1_in_poll, network2_complete_round_call network2_handle_action_round1_out_poll,
+     network2_complete_round_call network2_action_end_round1_poll,
+     network2_complete_round_call network2_action_start_round2_in_poll,
+     network2_complete_round_call network2_handle_action_round2_in_poll, network2_complete_round_call network2_handle_action_round2_out_poll,
+     network2_complete_round_call network2_action_end_round2_poll,
+     network2_complete_round_call network2_action_start_round3_in_poll,
+     network2_complete_round_call network2_handle_action_round3_in_poll, network2_complete_round_call network2_handle_action_round3_out_poll,
+     network2_complete_round_call network2_action_end_round3_poll,
+     network2_complete_round_call network2_action_round1_in,  network2_complete_round_call network2_action_round1_out,
+     network2_complete_round_call network2_action_round2_in,  network2_complete_round_call network2_action_round2_out,
+     network2_complete_round_call network2_action_round3_in,  network2_complete_round_call network2_action_round3_out,
      network2_complete_round_call network2_get_new_receive_buffer, /* get a new receive buffer for this poll - could be broadcast in */
      network2_complete_round_call network2_get_new_send_buffer, /* get a new send buffer - 0 length  - just to fill up  - why? */
      network2_complete_round_call network2_pull_next_send_buffer_from_queue /* get a semd buffer off the queue for this polling address - returns queue length */
-     ) ;
-
+     );
 
 
 extern int network2_poll_check(network2_complete *c); /* returns number of polls done
@@ -159,7 +193,6 @@ This assumes 6 (well, 5) inputs and 6 (well 5) outputs. We do not send to oursel
 
 
 
-extern int network2_send_command(network2_complete *c,char *command,int need_everyone_to_confirm);
 
 	  
 		    
