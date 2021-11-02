@@ -234,10 +234,11 @@ cv->buffers[stdin_port] = stdin_buffer;
 to_player = (participant_number+1)%6;
 while (running) {
 //    fprintf(stderr,"polling for player %d    outstate  %d  send_buffer_ready %d\n",to_player,c->poll_state[6+to_player],c->send_buffer_ready[to_player]);
-    if (cv->poll_state[6+to_player] ==5) { // waiting for us to clear the sent
-      cv->buflen[6+to_player]=0; // clear it
-      cv->poll_state[6+to_player]=3;
-      }
+    int sbr = (cv->buflen[6+to_player]==0);
+//    if (cv->poll_state[6+to_player] ==5) { // waiting for us to clear the sent
+//      cv->buflen[6+to_player]=0; // clear it
+//      cv->poll_state[6+to_player]=3;
+//?      }
 //    if ( (cv->poll_state[6+to_player] ==3)&& (cv->send_buffer_ready[to_player]))  {
     if ( (cv->poll_state[6+to_player] ==3)&& (cv->buflen[6+to_player]==0)) {
        int l=strlen(pending_send[to_player]);

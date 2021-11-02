@@ -109,7 +109,7 @@ typedef struct network2_complete {
   volatile network1_complete *cv1;
   int call_rounds[MAX_NUMBER_OF_POLLS];
 
-  int next_command_id[NUMBER_OF_NETWORK1_PARTICIPANTS];  
+  int next_command_id;
   int buflen[MAX_NUMBER_OF_POLLS]; // should work the same
   char *buffers[MAX_NUMBER_OF_POLLS]; // send it  or receive it - ctrl b or normal just add send quick. set the state as per for polling
 
