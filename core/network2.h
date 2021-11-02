@@ -97,11 +97,7 @@ typedef struct network2_complete {
   int next_command_id[NUMBER_OF_NETWORK1_PARTICIPANTS];  
   int buflen[MAX_NUMBER_OF_POLLS]; // should work the same
   char *buffers[MAX_NUMBER_OF_POLLS]; // send it  or receive it - ctrl b or normal just add send quick. set the state as per for polling
-  int send_buffer_ready[MAX_NUMBER_OF_POLLS];   // managed by player12
-  int temp_dont_poll_yet[MAX_NUMBER_OF_POLLS];  // send - set to 5 when done. wait till buflen is non 0 poll state 3
-  						// receive - one at a time to be executed.
-						// but could receive many at once - well, I guess  is per each in thread.
-						// so after stdin_in1,we can call it right again?
+
   int poll_state[MAX_NUMBER_OF_POLLS];       // pulled from network1 poll state/ except we can add and modify this one also
   int participant_number;                   // pulled from network1->participant_nmbver
   int communicator[MAX_NUMBER_OF_POLLS];    // pulled from network1->communicatore

@@ -23,7 +23,9 @@ int to_player=0;
 char stdin_buffer[50000];
 
 
-
+void test3() {
+fprintf(stderr,"tet3\n");
+}
 
 
 
@@ -48,6 +50,7 @@ if (cv->poll_state[i]==5) {
       s[0]=ch;
       s[1]='\0';
       strcat(pending_send[to_player],s);
+      test3();
 //      fprintf(stderr,"___pending is %s\n",pending_send[to_player]);
       } 
     }
@@ -235,7 +238,8 @@ while (running) {
       cv->buflen[6+to_player]=0; // clear it
       cv->poll_state[6+to_player]=3;
       }
-    if ( (cv->poll_state[6+to_player] ==3)&& (cv->send_buffer_ready[to_player]))  {
+//    if ( (cv->poll_state[6+to_player] ==3)&& (cv->send_buffer_ready[to_player]))  {
+    if ( (cv->poll_state[6+to_player] ==3)&& (cv->buflen[6+to_player]==0)) {
        int l=strlen(pending_send[to_player]);
 //       fprintf(stderr,"add %d\n",l);
        if (l) {

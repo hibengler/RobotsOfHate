@@ -123,7 +123,7 @@ networjk_attempt_send needs it full
   int call_rounds[MAX_NUMBER_OF_POLLS];
     
   int buflen[MAX_NUMBER_OF_POLLS];
-  char *buffers[MAX_NUMBER_OF_POLLS];
+  unsigned char *buffers[MAX_NUMBER_OF_POLLS];
   int temp_dont_poll_yet[MAX_NUMBER_OF_POLLS];
 
   int change_buffer_flag[MAX_NUMBER_OF_POLLS]; // true if the buffer is being changed by out calls, false otherwise
@@ -226,7 +226,7 @@ It makes states from
 This assumes 6 (well, 5) inputs and 6 (well 5) outputs. We do not send to ourselves
 
 */
-
+extern int network1_poll_check_nosleep(network1_complete *c); /* returns number of polls done but does not sleep */
 
 
 extern int network1_set_buffer(network1_complete *c,int bind_id,char *buffer, int buflen,int force_flag);
@@ -239,6 +239,5 @@ extern int network1_add_standard_input_fd(network1_complete *c,int fd,
      network1_complete_round_call network1_handle_action_round3_in_poll,
      network1_complete_round_call network1_get_new_receive_buffer);
 
-int rehearse_network(network1_complete *c);  /* find the other ones */
 
 #endif

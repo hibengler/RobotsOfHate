@@ -63,6 +63,36 @@ fprintf(stderr, "stdin_in3\n");
 
 
 
+int parse_buffer(volatile hate_frame *frame,volatile unsigned char buffer[],int index,int buflen) {
+if (index>=buflen)  {
+  return 0;
+  }
+  
+unsigned int a = buffer[index]*buffer[index+1];
+if (a+index >buflen) {
+  return 0;
+  }
+struct hate_action this_action;
+unsigned char *act = (unsigned char *)( &this_action);
+
+for (i=0;i<a;i++) {
+  act[i] = buffer[index+i];
+  }
+
+unsigned short action_id = this_action.action_id;
+if (action_id > HATE_NUMBER_ACTIONS) {
+  return(0);
+  }
+  
+
+// test it.
+volatile hate_action *ha = &(hate_frame->hate_actions[action_id]);
+int action_state = ha->hate_action_state;
+if (action_state==HATE_ACTION_NEW) {
+
+
+
+
 void do_in1(struct network1_complete *c,int i, int n) {
 volatile struct network1_complete *cv = (struct network1_complete *)c;
 fprintf(stderr,"do_in1 state is %d\b",c->poll_state[i]);
@@ -72,6 +102,10 @@ if (c->poll_state[i]>=6) {
 }
 else if (c->poll_state[i]==5) {
   c->buffers[i][c->buflen[i]]='\0';
+  c->buffers[i][c->buflen[i+1]]='\0';
+  int index=0;
+  while (parse_buffer(c->buffers[i]),
+
   strcat(received_buffers[communicator],c->buffers[i]);
   if (strlen(received_buffers[communicator])>60) {
     strcpy(received_buffers[communicator], received_buffers[communicator] +strlen(received_buffers[communicator])-60);

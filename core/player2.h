@@ -66,23 +66,12 @@ float rps[3];
 
 
 
-
-
-
-typedef struct hate_prep_action {
-unsigned short action_id,
-unsigned short length;
-unsigned short action_id;
-uchar hate_action_state;
-uchar hate_action_code;
-unsigned int now_frame;  // estimated frame when we sent the local timestamp, or 0 or -1
-
-struct timespec local_ts,
-float asked_for_start_time, 
-float try_again_offset
-} hate_prep_action;
-
-
+// thingid action objectid
+// 3 attacking things
+// 2 defending things
+// 2 neutral things
+// planet is defending
+// planet + all defenders vs planet + all attackers.
 
 typedef struct hate_thing {
   struct timespec global_ts; // 
@@ -116,12 +105,8 @@ typedef struct hate_robot {
 
 #define HATE_ACTION_READY_PLAYER 5
 
-typedef struct hate_action_ready_player {
-uchar hate_action_state;
-uchar hate_action_code;
-uchar player_id;
-uchar planet_id;
-struct timespec global_ts;
+
+
 
 
 typedef struct hate_action {
@@ -167,6 +152,7 @@ typedef struct hate_frame {
  hate_planet planets[HATE_NUMBER_PLANETS];
  hate_player players[HATE_NUMBER_PLAYERS_PLUS_1];
  hate_action actions[HATE_NUMBER_ACTIONS]; 
+ unsigned char 
  double current_time_bias_to_global[HATE_NUMBER_PLAYERS_PLUS_1];
  
  

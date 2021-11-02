@@ -145,9 +145,50 @@ void network12_action_finish_round3_poll (struct network1_complete *c1,int i, in
       
 
 void network12_handle_stdin_action_round1_in_poll (struct network1_complete *c1,int i, int n) {
+volatile struct network1_complete *cv1 = (volatile struct network1_complete *) c1;
+volatile struct network2_complete *cv2 = (volatile struct network2_complete *) c1;
+struct network2_complete *c2 = (struct network2_complete *) c1;
+
 /* called when we are starting*/
+if (cv1->poll_state[i]==5) {
+  if (cv2->poll_state[i]<3) {
+    cv2->buflen[i]=0;
+    cv2->poll_state[i]=3;
+    cv2->call_rounds[i]=1;
+    }
+  if (cv2->poll_state[i]==5) {
+    // need to wait
+    cv2->call_rounds[i]=1;
+    return;
+    }
+  else if  (cv2->poll_state[i]>=6) {  
+    cv2->buflen[i]=0;
+    cv2->poll_state[i]=3;
+    cv2->call_rounds[i]=1;
+    return;
+    }
+  else if  (cv2->poll_state[i]==3) {  
+    if ((cv2->buffers[i])&&(cv2->buflen[i]==0)) { 
+      memcpy((void *)(c2->buffers[i]),(void *)(c1->buffers[i]),cv1->buflen[i]);
+      cv2->poll_state[i]=5;
+      cv2->buflen[i]=cv1->buflen[i];
+      cv2->call_rounds[i]=1;
+      cv1->buflen[i]=0;
+      cv1->poll_state[i]=3;
+      cv1->call_rounds[i]=0;
+      return;
+      }
+    }  
+  return;
+  }  
+else if  (cv1->poll_state[i]>=6) {
+  cv1->buflen[i]=0;
+  cv1->poll_state[i]=3;
+  cv1->call_rounds[i]=0;
+  }    
 }
-    
+   
+     
 void network12_handle_stdin_action_round2_in_poll (struct network1_complete *c1,int i, int n) {
 }
   
@@ -160,21 +201,27 @@ void network2_handle_receive_buffer_in_receive_thread(struct network2_complete *
 volatile network1_complete *cv1 = c2->cv1;
 volatile network2_complete *cv2 = (volatile network2_complete *) c2;
 
-while (cv2->poll_state[i]==5) {
+if (cv2->poll_state[i]<3) {
+  cv2->poll_state[i]=3;
+  }
+else if (cv2->poll_state[i]==4) {
+  cv2->poll_state[i]=3;
+  }
+while (cv2->poll_state[i]!=3) {
 waitning:
   nsleep();
   }
 //assume simple now.
-if (cv2->poll_state[i]<3) {
-  cv2->poll_state[i]=3;
-  }
-while (cv2->buflen[i]) {
+if (cv2->buflen[i]) {
   goto waitning;
   }
 cv2->poll_state[i]=4;
-memcpy((void *)c2->buffers[i],(void *)c2->c1->buffers[i],cv1->buflen[i]);
-cv2->poll_state[i]=5;
-cv2->buflen[i]=cv1->buflen[i];;
+if ((cv1->buffers[i])&&(cv1->buflen[i])&&(cv1->buffers[i])) {
+  memcpy((void *)c2->buffers[i],(void *)c2->c1->buffers[i],c2->c1->buflen[i]);
+  }
+cv2->buflen[i] = cv1->buflen[i];
+cv2->poll_state[i] = cv1->poll_state[i];
+cv2->call_rounds[i]=1;
 
 cv1->buflen[i]=0;
 cv1->poll_state[i]=3;
@@ -193,6 +240,10 @@ cv1->call_rounds[i]=0;
 }
 
 
+
+
+
+
 void network2_handle_done_send_buffer_thread(struct network2_complete *c2,int i,int n,int round) {  // handles all packets as received commands , will call round 1,2,3 here, round2 in will call round 2,3
 struct network1_complete *c1 = c2->c1;
 volatile struct network1_complete *cv1 = (volatile struct network1_complete *) c2->cv1;
@@ -208,7 +259,8 @@ if (cv1->buffers[i][0] <= NETWORK2_HIGHEST_COMMAND ) {
       bummerparse:
       if (cv2->poll_state[i]==4) {
         cv2->poll_state[i]=3;
-	cv2->buflen[i]=3;
+	cv2->buflen[i]=0;
+//        cv2->send_buffer_ready[i]=1;
 	}
       cv1->poll_state[i]=3;
       cv1->buflen[i]=0;
@@ -245,13 +297,17 @@ if (cv1->buffers[i][0] <= NETWORK2_HIGHEST_COMMAND ) {
 else {
   if (cv2->poll_state[i]<3) {
     cv2->poll_state[i]=3;
+//    cv2->send_buffer_ready[i]=1;
+    }
+  else if (cv2->poll_state[i]==4) {
+    cv2->poll_state[i]=3;   
     }
   while (cv2->poll_state[i]!=3) {
     nsleep();
     }
   /* set t2 to be like c1 */
   cv2->call_rounds[i]=cv1->call_rounds[i];
-  cv2->send_buffer_ready[i] = cv1->send_buffer_ready[i];
+//  cv2->send_buffer_ready[i] = cv1->send_buffer_ready[i];
   if ((cv1->buffers[i])&&(cv1->buflen[i])&&(cv2->buffers[i])) {
     memcpy((void *)c2->buffers[i],(void *)c1->buffers[i],c1->buflen[i]);
     }
@@ -273,9 +329,13 @@ else {
       }
     }
   cv1->call_rounds[i] = cv2->call_rounds[i];
-  cv1->send_buffer_ready[i] = cv2->send_buffer_ready[i];
+//  cv1->send_buffer_ready[i] = cv2->send_buffer_ready[i];
   cv1->poll_state[i] = cv2->poll_state[i];    
   cv1->buflen[i] = cv2->buflen[i];
+//  if ((cv2->poll_state[i]==3)&&(cv2->buflen[i]==0)) {
+//    cv2->send_buffer_ready[i]=1;
+//    }
+   
   }
   
 
@@ -285,20 +345,57 @@ else {
 
 
 
-void network12_get_new_send_buffer (struct network1_complete *c1,int i, int n) {
+void network12_pull_next_send_buffer_from_queue (struct network1_complete *c1,int i, int n) {
 struct network2_complete *c2 = (struct network2_complete *) c1;
 volatile struct network1_complete *cv1 = (volatile struct network1_complete *) c1;
 volatile struct network2_complete *cv2 = (volatile struct network2_complete *) c2;
+int bind_id=i;
 if (cv2->poll_state[i]<3) {
     cv2->poll_state[i]=3;
     }
 int cv2_send=0;
 if (cv2->poll_state[i]==3) {
-  if ((cv2->buffers[i])&&(cv2->buflen[i])) {
+  int flag=0;
+  if (cv2->buffers[i]){
+    if (cv2->buflen[bind_id]) {
+      flag=1;
+      }
+    else {
+      if (cv2->network2_pull_next_send_buffer_from_queue[bind_id]) {
+          (*cv2->network2_pull_next_send_buffer_from_queue[bind_id])(c2,bind_id,0);
+          }
+      }
+    }
+  else {
+    if (cv2->network2_pull_next_send_buffer_from_queue[bind_id]) {
+      (*cv2->network2_pull_next_send_buffer_from_queue[bind_id])(c2,bind_id,0);
+      }
+    }
+    
+  if ((cv2->buffers[bind_id]!=NULL)&&(cv2->buflen[bind_id])) {
+    flag=1;
+    }
+  else {
+    if (cv2->buffers[bind_id]==NULL) {
+      if (cv2->network2_get_new_send_buffer[bind_id]) {
+        (*cv2->network2_get_new_send_buffer[bind_id])(c2,bind_id,0);
+        }
+      }
+    if (cv2->buffers[bind_id]) {
+      if (cv2->buflen[bind_id]) {
+        flag=1;
+        }
+      }
+    }
+  if (flag) {
     cv2->poll_state[i]=4;
     cv2_send = 1;
     }
   }
+  
+    
+  
+
 int other_send=0;
 
 for (int j=0;j<NUMBER_OF_NETWORK1_PARTICIPANTS_TIMES_2;j++) {
@@ -482,12 +579,15 @@ if (cv1->type[i]==2) {
       if (cv2->poll_state[i]<3) {
         cv2->poll_state[i]=3;
         }
+      else if (cv2->poll_state[i]==4) {
+        cv2->poll_state[i]=3;
+	}	
       while (cv2->poll_state[i]!=3) {
 	nsleep();
 	}
     /* set t2 to be like c1 */
       cv2->call_rounds[i]=cv1->call_rounds[i];
-      cv2->send_buffer_ready[i] = cv1->send_buffer_ready[i];
+ //     cv2->send_buffer_ready[i] = cv1->send_buffer_ready[i];
       if ((cv1->buffers[i])&&(cv1->buflen[i])&&(cv2->buffers[i])) {
         memcpy((void *)c2->buffers[i],(void *)c1->buffers[i],c1->buflen[i]);
         }
@@ -495,7 +595,7 @@ if (cv1->type[i]==2) {
       cv2->poll_state[i] = cv1->poll_state[i];
       (*c2->network2_handle_action_round1[i])(c2,i,1); 
       cv1->call_rounds[i] = cv2->call_rounds[i];
-      cv1->send_buffer_ready[i] = cv2->send_buffer_ready[i];
+//      cv1->send_buffer_ready[i] = cv2->send_buffer_ready[i];
       cv1->poll_state[i] = cv2->poll_state[i];    
       cv1->buflen[i] = cv2->buflen[i];
       return; 
@@ -546,12 +646,16 @@ if (cv1->type[i]==3) {
       if (cv2->poll_state[i]<3) {
         cv2->poll_state[i]=3;
         }
+      else if (cv2->poll_state[i]==4) {
+        cv2->poll_state[i]=3;
+	}
+      
       while ((cv2->poll_state[i]!=3)||(cv2->buflen==0)) {
 	nsleep();
 	}
       /* set t2 to be like c1 */
       cv2->call_rounds[i]=cv1->call_rounds[i];
-      cv2->send_buffer_ready[i] = cv1->send_buffer_ready[i];
+//      cv2->send_buffer_ready[i] = cv1->send_buffer_ready[i];
       if ((cv1->buffers[i])&&(cv1->buflen[i])&&(cv2->buffers[i])) {
         memcpy((void *)c2->buffers[i],(void *)c1->buffers[i],c1->buflen[i]);
         }
@@ -559,7 +663,7 @@ if (cv1->type[i]==3) {
       cv2->poll_state[i] = cv1->poll_state[i];
       (*c2->network2_handle_action_round1[i])(c2,i,1); 
       cv1->call_rounds[i] = cv2->call_rounds[i];
-      cv1->send_buffer_ready[i] = cv2->send_buffer_ready[i];
+//      cv1->send_buffer_ready[i] = cv2->send_buffer_ready[i];
       cv1->poll_state[i] = cv2->poll_state[i];    
       cv1->buflen[i] = cv2->buflen[i];
       }
@@ -585,7 +689,7 @@ else if (cv1->type[i]==1) {
     /* this could block the receive thread until the poll handles things, which could be multiple times , or maybe this is also handled in the receive thread */
     }
   }
-cv1->buflen[0];
+cv1->buflen[i]=0;
 cv1->poll_state[i]=3;
 cv1->call_rounds[i]=0;
 }
@@ -608,7 +712,7 @@ volatile struct network2_complete *cv2 = (volatile struct network2_complete *)(c
 }
 
 
-void network12_pull_next_send_buffer_from_queue (struct network1_complete *c1,int i, int n) {
+void network12_get_new_send_buffer(struct network1_complete *c1,int i, int n) {
 }
 
 
@@ -643,7 +747,6 @@ alternate, and better - because it activates 4 earlier:
 
 
 
-
 /* call after network2_init to add a file or non udp socket port */
 int network2_add_standard_input_fd(network2_complete *c2,int fd,  
      network2_complete_round_call network2_handle_action_round1_in_poll,  
@@ -651,12 +754,24 @@ int network2_add_standard_input_fd(network2_complete *c2,int fd,
      network2_complete_round_call network2_handle_action_round3_in_poll,   
      network2_complete_round_call network2_get_new_receive_buffer) {
 network1_complete *c1 = c2->c1;
-return network1_add_standard_input_fd(c1,fd,network12_handle_action_round1_in_poll,
-network12_handle_action_round2_in_poll,
-network12_handle_action_round3_in_poll,
-network12_get_new_receive_buffer
+volatile network1_complete *cv1 = c2->cv1;
+volatile network2_complete *cv2 = (volatile network2_complete *)c2;
+int i=cv1->current_number_of_polls;
+cv1->buflen[i]= 0;
+cv1->buffers[i]= &c2->internal_buffer[i][0];
+cv2->buflen[i]= 0;
 
+cv2->network2_handle_action_round1_poll[i] = network2_handle_action_round1_in_poll;
+cv2->network2_handle_action_round2_poll[i] = network2_handle_action_round2_in_poll;
+cv2->network2_handle_action_round3_poll[i] = network2_handle_action_round3_in_poll;
+
+int result=network1_add_standard_input_fd(c1,fd,network12_handle_stdin_action_round1_in_poll,
+network12_handle_stdin_action_round2_in_poll,
+network12_handle_stdin_action_round3_in_poll,
+network12_get_new_receive_buffer
 );
+return result;
+
 }
 
 
@@ -705,7 +820,7 @@ network1_init(c2->c1,participant_number,broadcast_ip,ips,
   network12_handle_action_round3_in_poll,
   network12_handle_action_round3_out_poll,
   network12_action_finish_round3_poll,
-  network12_handle_action_round1_in,
+  network12_handle_action_round1_in, 
   network12_handle_action_round1_out,
   network12_handle_action_round2_in,
   network12_handle_action_round2_out,
@@ -796,8 +911,7 @@ return 1;
 
 
 
-
-int network2_poll_check(network2_complete *c2) {
+int network2_poll_check_nosleep(network2_complete *c2) {
 int i;
 volatile network2_complete *cv2=c2;
 network1_complete *c1 = c2->c1;
@@ -805,7 +919,7 @@ volatile network1_complete *cv1 = c2->cv1;
 
 //network2_reset_sendables_and_stuff(c);
 
-int number_to_round = network1_poll_check(c1);
+int number_to_round = network1_poll_check_nosleep(c1);
 
 
 
@@ -817,6 +931,7 @@ number_to_round = 0;
 for (i=0;i<cv1->current_number_of_polls;i++) {
   if (cv2->call_rounds[i]) number_to_round++;
   }  
+
       
 if (!number_to_round) return 0;
 
@@ -932,7 +1047,16 @@ full_check_poll_loop:
    
 if (!number_to_round) nsleep();
    
-return 0;
+return number_to_round;
+}
+
+
+
+
+int network2_poll_check(network2_complete *c2) {
+int result = network2_poll_check_nosleep(c2);
+if (!result) nsleep();
+return result;
 }
 
 /* end of network2.c */

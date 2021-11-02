@@ -36,8 +36,28 @@ xterm -fg cyan -bg purple -geometry 120x49+750+650 	-e " ./test5_player  10.20.1
 
 
 
-xterm -fg black -bg pink -geometry 120x49+20+20 	-e " ./test5_player  10.20.1.2 10.20.1.2 10.20.1.2 10.20.1.2 10.20.1.15 10.20.1.15 0 2>a0" &
-xterm -fg black -bg orange -geometry 120x49+750+20 	-e " ./test5_player  10.20.1.2 10.20.1.2 10.20.1.2 10.20.1.2 10.20.1.15 10.20.1.15 1 2>a1" &
+xterm -fg black -bg pink -geometry 120x49+20+20 	-e " ./test5_player  10.20.1.2 10.20.1.2 10.20.1.2 10.20.1.2 10.20.1.2 10.20.1.2 0 2>a0" &
+xterm -fg black -bg orange -geometry 120x49+750+20 	-e " ./test5_player  10.20.1.2 10.20.1.2 10.20.1.2 10.20.1.2 10.20.1.2 10.20.1.2 1 2>a1" &
+gdb ./test6_playern2 
+b network12_handle_stdin_action_round1_in_poll
+b network12_handle_action_round1_out
+b test
+b network12_get_new_send_buffer
+
+
+r 10.20.1.2 10.20.1.2 10.20.1.2 10.20.1.2 10.20.1.2 10.20.1.2 2 2>a2
+
+
+killall gdb
+
+
+
+xterm -fg black -bg orange -geometry 120x49+750+20 	-e " ./test6_playern2  10.20.1.2 10.20.1.2 10.20.1.2 10.20.1.2 10.20.1.2 10.20.1.2 2 2>a2" &
+
+
+
+
+
 xterm -fg black -bg yellow -geometry 120x49+1500+20 	-e " ./test5_player  10.20.1.2 10.20.1.2 10.20.1.2 10.20.1.2 10.20.1.15 10.20.1.15 2 2>a2" &
 xterm -fg black -bg green -geometry 120x49+2250+20 	-e " ./test5_player  10.20.1.2 10.20.1.2 10.20.1.2 10.20.1.2 10.20.1.15 10.20.1.15 3 2>a3" &
 xterm -fg cyan -bg blue -geometry 120x49+3000+20 	-e " ./test5_player  10.20.1.2 10.20.1.2 10.20.1.2 10.20.1.2 10.20.1.15 10.20.1.15 4 2>a4" &

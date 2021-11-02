@@ -19,38 +19,22 @@
 #define HATE_NUMBER_LEAGUES 7
 
 
-/* glory goes up based on a win, and down on a loose, but glory gets its own role
-with the reverse risk, there is more glory in attacking
-Glory has no use right now.
-each role does different values on each other role.
-r -> p 1 to 3
-r -> s 3 to 1
-R -> r even
-etc.
-The white balanced have higher default sqrt(r^2+p^2+s^2/white bar / sqrt2) or something.
-*/
-typedef struct hate_rps { // rock, paper,scissors
-float rps[3];
-} hate_rps;
-
 typedef struct hate_robot {
-  uchar mode; // attack, defend, neutral
-  uchar current_planet;
-  uchar destination_planet;
-  uchar position;  // position to destination, if on destination, that planet controlls the battle
-  hate_rps strength;
+  super_point current_point; // ref player that played it. -hdist to hdist
+  super_point last_point;
+  float size;
+  float sizetimessize;
+  int need_to_show_ghost_last_point;
+  int need_to_show_ghost_first_point;
+  super_point current_ghost_point;
+  super_point last_ghost_point;
 } hate_robot;
 
 
 typedef struct hate_player {
-  uchar mode; // disconnected, playing, lobby
-  uchar player_id; /* 0-5 */
+  int player_id; /* 0-5 */
   struct hate_robot robots[HATE_NUMBER_ROBOTS];
 } hate_player;
-
-
-
-
 
 typedef struct hate_screen {
   int player_id;

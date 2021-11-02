@@ -4,7 +4,7 @@ LDFLAGS =  -lpthread
 
 
 #system: test_superpos superpos.a 
-system: test_superpos test2_draw_superpos test3_draw_robots test4_with_sound test5_player
+system: test_superpos test2_draw_superpos test3_draw_robots test4_with_sound test5_player test6_playern2
 
 
 test_superpos: test_superpos.o superpos.o
@@ -66,9 +66,11 @@ test4_with_sound:  superpos.o hibfonts.a larry_harvey_has_a_possee.o player.o \
 	       -ldl -lrt -lX11 -lm -DPLATFORM_DESKTOP -pthread
 	       
 
+test6_playern2: network2.o test6_playern2.o network1.o 
+	gcc -p $(LDFLAGS)  -g -o test6_playern2 test6_playern2.o network1.o  network2.o  -lpthread
+	
 test5_player: test5_player.o network1.o 
 	gcc -p $(LDFLAGS)  -g -o test5_player test5_player.o network1.o   -lpthread
-
 
 test4_with_sound.o: test4_with_sound.c superpos.h	
 	gcc $(CFLAGS) -c -g test4_with_sound.c
@@ -99,7 +101,11 @@ simple_packet_summary.o: simple_packet_summary.c
 test5_player.o: test5_player.c network1.h
 	gcc -c  $(CFLAGS)  -Wl,-rpath -Wl,LIBDIR  test5_player.c
 
+test6_playern2.o: test6_playern2.c network1.h network2.h
+	gcc -c  $(CFLAGS)  -Wl,-rpath -Wl,LIBDIR  test6_playern2.c
+
 network1.o: network1.c network1.h
 	gcc -c  $(CFLAGS)  -Wl,-rpath -Wl,LIBDIR  network1.c
 
-
+network2.o: network2.c network2.h network1.h
+	gcc -c  $(CFLAGS)  -Wl,-rpath -Wl,LIBDIR  network2.c
