@@ -40,12 +40,12 @@ read - 256 packets - 6
 #define NETWORK2_LEN 2048
 
 
+struct network2_packeted_command;
+
 typedef struct network2_queue {
 int head;
 int tail;
-unsigned short command_id[NETWORK2_QUEUE_SIZE];
-unsigned char command_code[NETWORK2_QUEUE_SIZE];
-unsigned char state_number[NETWORK2_QUEUE_SIZE];
+volatile struct network2_packeted_command *packeted_commands[NETWORK2_QUEUE_SIZE];
 } network2_queue;
 
 
@@ -82,6 +82,21 @@ unsigned char executed_state[NUMBER_OF_NETWORK1_PARTICIPANTS]; // recv sets this
 unsigned char clear_state[NUMBER_OF_NETWORK1_PARTICIPANTS]; // send sets whis when attempt to clear out
 unsigned char did_states[NETWORK2_STATE_LENGTH];
 } network2_internal_command;
+
+
+
+#define NETWORK2_PATH_NOTHING_STATE_NOTHING 0
+#define NETWORK2_PATH_SIMPLE_STATE_SIMPLE 1
+#define NETWORK2_PATH_BROADCAST_ALLACK_ALL 2
+
+typedef struct network2_packeted_command {
+network2_internal_command packeted_ic;
+unsigned char bind_id;
+unsigned char code;
+unsigned short length; // length of actual command text
+unsigned char *the_command[2048];
+unsigned char this_state;
+} network2_packeted_command;
 
 
 /* we will have standard send and receive that trumps the other send and receive one time

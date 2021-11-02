@@ -1,4 +1,4 @@
-
+//
 
 
 
@@ -242,6 +242,480 @@ cv1->call_rounds[i]=0;
 
 
 
+void path_finished_sending_acknowlegement(struct network2_complete *c2,volatile network2_packeted_command *pc,volatile network2_internal_command *icv) {
+unsigned char this_state = pc->this_state;
+if (icv->did_states[this_state] ==0) {
+  icv->did_states[this_state] = 1;
+  // later have some calls that are per states
+  if (this_state==NETWORK2_PATH_NOTHING_STATE_NOTHING) {
+    }
+  else if (this_state==NETWORK2_PATH_SIMPLE_STATE_SIMPLE) {
+    }
+  }
+}
+
+
+
+void path_finished_receiving_acknowlegement(struct network2_complete *c2,volatile network2_packeted_command *pc,volatile network2_internal_command *icv) {
+unsigned char this_state = pc->this_state;
+if (icv->did_states[this_state] ==0) {
+  icv->did_states[this_state] = 1;
+  for (int j=0;j<NUMBER_OF_NETWORK1_PARTICIPANTS;j++) {
+    icv->acknowledged_state[j] != pc->packeted_ic.acknowledged_state[j];
+    }
+  // later have some calls that are per states
+  if (this_state==NETWORK2_PATH_NOTHING_STATE_NOTHING) {
+    }
+  else if (this_state==NETWORK2_PATH_SIMPLE_STATE_SIMPLE) {
+    }
+  }
+}
+
+
+
+
+
+
+
+
+void path_queue_up(struct network2_complete *c2,volatile network2_packeted_command *pc,int me_bind_id,int to_bind_id) {
+volatile network2_complete *cv2 = (volatile network2_complete *)c2;
+volatile network2_queue *q =  &(cv2->queues_from_poll_to_send[to_bind_id][me_bind_id]);
+while (((q->tail+1)%NETWORK2_QUEUE_SIZE) == q->head) {
+  nsleep();
+  }
+int tail =  ((q->tail+1)%NETWORK2_QUEUE_SIZE);
+q->packeted_commands[tail] = (network2_packeted_command *)malloc(sizeof(network2_packeted_command));
+memcpy((void *)q->packeted_commands[tail],(void *)pc,sizeof(network2_packeted_command));
+q->tail = tail;
+}
+
+
+
+
+
+#ifdef later
+int path_new_command(struct network2_complete *c2,unsigned char *command,int length, int initial_state, int prefered_first,int prefered_next) {
+int command_id = network2_get_free_command_number(c2);
+network2_packeted_command pcc;
+network2_packeted_command *pc = &pcc;
+network2_internal_command *ic = &pc->packeted_ic;
+ic->length = length;
+ic->id = command_id;
+ic->code=3;
+
+for (int j=0;j<NUMBER_OF_NETWORK1_PARTICIPANTS;j++) {
+  ic->network_order[j]=-1;
+  }
+ic->network_order[0] = c2->c1v->participant_number;
+if (preferred_first!=-1) {
+  ic->network_order[1] = preferred_first;
+  if(preferred_next != -1) {
+    ic->network_order[1] = preferred_next;
+    }
+  }  
+for (int j=0;j<NUMBER_OF_NETWORK1_PARTICIPANTS;j++) {
+  ic->network_order[j]=-1;
+  }
+    
+
+
+}
+
+#endif
+
+void path_queue_execute_on_poll(struct network2_complete *c2,volatile network2_packeted_command *pc,volatile network2_internal_command *icv) {
+int pn = c2->cv1->participant_number;
+if ((icv->executed_state[pn])==0) {
+  path_queue_up(c2,pc,pc->bind_id,pn);
+  }
+}
+
+
+void path_finished_sending_command(struct network2_complete *c2,volatile network2_packeted_command *pc,volatile network2_internal_command *icv) {
+unsigned char this_state = pc->this_state;
+if (icv->did_states[this_state] ==0) {
+  icv->did_states[this_state] = 1;
+  // later have some calls that are per states
+  if (this_state==NETWORK2_PATH_NOTHING_STATE_NOTHING) {
+    }
+  else if (this_state==NETWORK2_PATH_SIMPLE_STATE_SIMPLE) {
+    }
+  }
+}
+
+
+
+void path_finished_receiving_command(struct network2_complete *c2,volatile network2_packeted_command *pcv,volatile network2_internal_command *icv) {
+unsigned char this_state = pcv->this_state;
+int pn = c2->cv1->participant_number;
+if (icv->did_states[this_state] ==0) {
+  icv->did_states[this_state] = 1;
+  for (int j=0;j<NUMBER_OF_NETWORK1_PARTICIPANTS;j++) {
+    icv->acknowledged_state[j] |= pcv->packeted_ic.acknowledged_state[j];
+    }
+  icv->sent_state[pcv->bind_id] = 1;
+  icv->acknowledged_state[pn] = 1;
+  
+  // later have some calls that are per states
+  if (this_state==NETWORK2_PATH_NOTHING_STATE_NOTHING) {
+    path_queue_execute_on_poll(c2,pcv,icv);
+    }
+  else if (this_state==NETWORK2_PATH_SIMPLE_STATE_SIMPLE) {
+    path_queue_execute_on_poll(c2,pcv,icv);
+    }
+  }
+}
+
+
+
+
+
+
+void path_finished_sending_redo(struct network2_complete *c2,volatile network2_packeted_command *pcv,volatile network2_internal_command *icv) {
+unsigned char this_state = pcv->this_state;
+if (icv->did_states[this_state] ==0) {
+  icv->did_states[this_state] = 1;
+  // later have some calls that are per states
+  if (this_state==NETWORK2_PATH_NOTHING_STATE_NOTHING) {
+    }
+  else if (this_state==NETWORK2_PATH_SIMPLE_STATE_SIMPLE) {
+    }
+  }
+}
+
+
+
+void path_finished_receiving_redo(struct network2_complete *c2,volatile network2_packeted_command *pc,volatile network2_internal_command *icv) {
+unsigned char this_state = pc->this_state;
+if (icv->did_states[this_state] ==0) {
+  icv->did_states[this_state] = 1;
+  // later have some calls that are per states
+  if (this_state==NETWORK2_PATH_NOTHING_STATE_NOTHING) {
+    }
+  else if (this_state==NETWORK2_PATH_SIMPLE_STATE_SIMPLE) {
+    }
+  }
+}
+
+
+
+
+
+void parse_internal_command_state(volatile network2_internal_command *icv,volatile unsigned char *x) {
+unsigned char send = *x;
+if (send &1) icv->sent_state[0] = 1;
+if (send &2) icv->sent_state[1] = 1;
+if (send &4) icv->sent_state[2] = 1;
+if (send &8) icv->sent_state[3] = 1;
+if (send &16) icv->sent_state[4] = 1;
+if (send &32) icv->sent_state[5] = 1;
+x++;
+
+unsigned char ack = *x;
+if (ack &1) icv->acknowledged_state[0] = 1;
+if (ack &2) icv->acknowledged_state[1] = 1;
+if (ack &4) icv->acknowledged_state[2] = 1;
+if (ack &8) icv->acknowledged_state[3] = 1;
+if (ack &16) icv->acknowledged_state[4] = 1;
+if (ack &32) icv->acknowledged_state[5] = 1;
+x++;
+
+unsigned char executed = *x;
+if (executed &1) icv->executed_state[0] = 1;
+if (executed &2) icv->executed_state[1] = 1;
+if (executed &4) icv->executed_state[2] = 1;
+if (executed &8) icv->executed_state[3] = 1;
+if (executed &16) icv->executed_state[4] = 1;
+if (executed &32) icv->executed_state[5] = 1;
+x++;
+
+unsigned char clear = *x;
+if (clear &1) icv->clear_state[0] = 1;
+if (clear &2) icv->clear_state[1] = 1;
+if (clear &4) icv->clear_state[2] = 1;
+if (clear &8) icv->clear_state[3] = 1;
+if (clear &16) icv->clear_state[4] = 1;
+if (clear &32) icv->clear_state[5] = 1;
+x++;
+
+
+}
+
+
+
+
+int parse_next_packeted_command(
+ struct network2_complete *c2,int bind_id,volatile unsigned char *x,int *ppos, int maxlen, volatile network2_packeted_command *pcv)  {
+
+
+   
+memset((void *)pcv,0,sizeof(network2_packeted_command));
+pcv->bind_id = bind_id;
+
+volatile network2_internal_command *icv = &(pcv->packeted_ic);
+
+if (*ppos >maxlen) {
+  return 0;
+  }
+
+int pn = c2->cv1->participant_number;
+
+if ( (x[*ppos] > NETWORK2_HIGHEST_COMMAND) ) {
+simple:
+  icv->length = maxlen-*ppos +3;
+  icv->id = -1;
+  pcv->code = 2;
+  icv->code = 2;
+  
+  int no=0;
+  int receiving=0;
+  int sending=0;
+  if (bind_id < NUMBER_OF_NETWORK1_PARTICIPANTS) {
+    icv->network_order[no++]=bind_id;
+    icv->network_order[no++]=pn;
+    receiving=1;
+    sending=0;
+    } 
+  else {
+    icv->network_order[no++]=pn;
+    icv->network_order[no++]=bind_id - NUMBER_OF_NETWORK1_PARTICIPANTS;
+    sending=1;
+    receiving=0;
+    }
+  for (int j=no;j<NUMBER_OF_NETWORK1_PARTICIPANTS;j++) {
+    icv->network_order[j]=-1;
+    }
+    
+  for (int j=0;j<NUMBER_OF_NETWORK1_PARTICIPANTS;j++) {
+    icv->sent_state[j]=0;
+    icv->acknowledged_state[j]=0;
+    icv->executed_state[j]=0;
+    icv->clear_state[j]=0;
+    }
+  for (int j=0;j<NETWORK2_STATE_LENGTH;j++) {
+    icv->did_states[j]=0;
+    }
+  
+  pcv->length = maxlen - *ppos;
+  pcv->this_state = NETWORK2_PATH_SIMPLE_STATE_SIMPLE;
+  memcpy((void *)pcv->the_command,(void *)(x+*ppos),pcv->length);
+  *ppos += pcv->length;
+  return 1;
+  }
+ 
+
+icv->code = x[*ppos];
+pcv->code = icv->code;
+  
+if (icv->code == 1) { // ctrl-a
+  unsigned int intlen;
+  if (*ppos+2 > maxlen) {goto simple;}
+    intlen = (unsigned int)((unsigned char)x[*ppos+1]) + (unsigned int)((unsigned char)x[*ppos+2])<<8;
+  if ((intlen + *ppos) > maxlen) {goto simple;}
+  if (intlen < 10) {goto simple;}
+  icv->length = intlen;
+  
+  unsigned int  command_id = (unsigned int)((unsigned char)x[*ppos+3]) + (unsigned int)((unsigned char)x[*ppos+4])<<8;
+  if ((command_id < 0)||(command_id>=NETWORK2_NUMBER_COMMANDS)) {goto simple;}
+  icv->id = command_id;
+
+  // estimate network order  
+  int no=0;
+  int receiving=0;
+  int sending=0;
+  if (bind_id < NUMBER_OF_NETWORK1_PARTICIPANTS) {
+    icv->network_order[no++]=bind_id;
+    icv->network_order[no++]=pn;
+    receiving=1;
+    sending=0;
+    } 
+  else {
+    icv->network_order[no++]=pn;
+    icv->network_order[no++]=bind_id - NUMBER_OF_NETWORK1_PARTICIPANTS;
+    sending=1;
+    receiving=0;
+    }
+  for (int j=no;j<NUMBER_OF_NETWORK1_PARTICIPANTS;j++) {
+    icv->network_order[j]=-1;
+    }
+  
+  
+
+  parse_internal_command_state(icv,(volatile unsigned char *) (x+*ppos+5));
+  
+  // estimate
+  for (int j=0;j<NETWORK2_STATE_LENGTH;j++) {
+    icv->did_states[j]=0;
+    }
+    
+  unsigned char current_position = x[*ppos+9];
+  if (current_position>=NETWORK2_STATE_LENGTH) { goto simple;}
+  
+  icv->did_states[current_position]=1;
+  
+  pcv->length = icv->length-10;
+  pcv->this_state = current_position;
+  memcpy((void *)pcv->the_command,(void *)(x+*ppos+10),pcv->length);
+  *ppos += icv->length;
+  return 1;
+  } // ctrl-a acknowledge
+
+
+
+
+if (icv->code == 2) { // ctrl-b
+  unsigned int intlen;
+  if (*ppos+2 > maxlen) {goto simple;}
+    intlen = (unsigned int)((unsigned char)x[*ppos+1]) + (unsigned int)((unsigned char)x[*ppos+2])<<8;
+  if ((intlen + *ppos) > maxlen) {goto simple;}
+  if (intlen < 3) {goto simple;}
+  icv->length = intlen;
+  
+  int no=0;
+  int receiving=0;
+  int sending=0;
+  if (bind_id < NUMBER_OF_NETWORK1_PARTICIPANTS) {
+    icv->network_order[no++]=bind_id;
+    icv->network_order[no++]=pn;
+    receiving=1;
+    sending=0;
+    } 
+  else {
+    icv->network_order[no++]=pn;
+    icv->network_order[no++]=bind_id - NUMBER_OF_NETWORK1_PARTICIPANTS;
+    sending=1;
+    receiving=0;
+    }
+  for (int j=no;j<NUMBER_OF_NETWORK1_PARTICIPANTS;j++) {
+    icv->network_order[j]=-1;
+    }
+    
+        
+  for (int j=0;j<NUMBER_OF_NETWORK1_PARTICIPANTS;j++) {
+    icv->sent_state[j]=0;
+    icv->acknowledged_state[j]=0;
+    icv->executed_state[j]=0;
+    icv->clear_state[j]=0;
+    }
+  for (int j=0;j<NETWORK2_STATE_LENGTH;j++) {
+    icv->did_states[j]=0;
+    }
+  
+  pcv->length = icv->length-3;
+  pcv->this_state = NETWORK2_PATH_SIMPLE_STATE_SIMPLE;
+  memcpy((void *)pcv->the_command,(void *)(x+*ppos+3),pcv->length);
+  *ppos += icv->length;
+  return 1;
+  }
+
+
+
+
+
+  
+if (icv->code == 3) { // ctrl-c
+  unsigned int intlen;
+  if (*ppos+2 > maxlen) {goto simple;}
+    intlen = (unsigned int)((unsigned char)x[*ppos+1]) + (unsigned int)((unsigned char)x[*ppos+2])<<8;
+  if ((intlen + *ppos) > maxlen) {goto simple;}
+  if (intlen < 16) {goto simple;}
+  icv->length = intlen;
+
+    
+  unsigned int command_id;
+    command_id = (unsigned int)((unsigned char)x[*ppos+3]) + (unsigned int)((unsigned char)x[*ppos+4])<<8;
+  if ((command_id < 0)||(command_id>=NETWORK2_NUMBER_COMMANDS)) {goto simple;}
+  icv->id = command_id;
+  
+  for (int j=0;j<NUMBER_OF_NETWORK1_PARTICIPANTS;j++) {
+    icv->network_order[j]=x[*ppos+5+j];
+    if ((icv->network_order[j]==255)||
+         ((icv->network_order[j]>=0)&&
+          (icv->network_order[j]<NUMBER_OF_NETWORK1_PARTICIPANTS)))  {
+      }
+    else { goto simple;}
+    }
+	
+  parse_internal_command_state(icv,(volatile unsigned char *) (x+*ppos+5));
+  
+  // estimate
+  for (int j=0;j<NETWORK2_STATE_LENGTH;j++) {
+    icv->did_states[j]=0;
+    }
+    
+  unsigned char current_position = x[*ppos+15];
+  if (current_position>=NETWORK2_STATE_LENGTH) { goto simple;}
+  
+  icv->did_states[current_position]=1;
+        
+  pcv->length = icv->length-16;
+  pcv->this_state = current_position;
+  memcpy((void *)pcv->the_command,(void *)(x+*ppos+16),pcv->length);
+  *ppos += icv->length;
+  return 1;
+  }
+
+
+
+
+if (icv->code == 5) { // ctrl-e
+  unsigned int intlen;
+  if (*ppos+2 > maxlen) {goto simple;}
+    intlen = (unsigned int)((unsigned char)x[*ppos+1]) + (unsigned int)((unsigned char)x[*ppos+2])<<8;
+  if ((intlen + *ppos) > maxlen) {goto simple;}
+  if (intlen < 10) {goto simple;}
+  icv->length = intlen;
+  
+  unsigned int command_id;
+    command_id = (unsigned int)((unsigned char)x[*ppos+3]) + (unsigned int)((unsigned char)x[*ppos+4])<<8;
+  if ((command_id < 0)||(command_id>=NETWORK2_NUMBER_COMMANDS)) {goto simple;}
+  icv->id = command_id;
+  
+
+  // estimate network order  
+  int no=0;
+  int receiving=0;
+  int sending=0;
+  if (bind_id < NUMBER_OF_NETWORK1_PARTICIPANTS) {
+    icv->network_order[no++]=bind_id;
+    icv->network_order[no++]=pn;
+    receiving=1;
+    sending=0;
+    } 
+  else {
+    icv->network_order[no++]=pn;
+    icv->network_order[no++]=bind_id - NUMBER_OF_NETWORK1_PARTICIPANTS;
+    sending=1;
+    receiving=0;
+    }
+  for (int j=no;j<NUMBER_OF_NETWORK1_PARTICIPANTS;j++) {
+    icv->network_order[j]=-1;
+    }
+  
+  
+  // estimate
+  for (int j=0;j<NETWORK2_STATE_LENGTH;j++) {
+    icv->did_states[j]=0;
+    }
+    
+  unsigned char current_position = x[*ppos+5];
+  if (current_position>=NETWORK2_STATE_LENGTH) { goto simple;}
+  
+  icv->did_states[current_position]=1;
+  
+  pcv->length = icv->length-5;
+  pcv->this_state = current_position;
+  memcpy((void *)pcv->the_command,(void *)(x+*ppos+5),pcv->length);
+  *ppos += icv->length;
+  return 1;
+  } // ctrl-e acknowledge
+
+
+
+}
+
+
 
 
 void network2_handle_done_send_buffer_thread(struct network2_complete *c2,int i,int n,int round) {  // handles all packets as received commands , will call round 1,2,3 here, round2 in will call round 2,3
@@ -251,49 +725,30 @@ volatile struct network2_complete *cv2 = (volatile struct network2_complete *) c
 
 
 if (cv1->buffers[i][0] <= NETWORK2_HIGHEST_COMMAND ) {
-  cv2->internal_position[i]=0;
-  while (cv2->internal_position[i] < cv1->buflen[i]) {
-    char code = cv1->buffers[i][cv2->internal_position[i]];
-    if ((code!=3) ||(code != 5) ||(code !=1)||(code !=2)) {
-      fprintf(stderr,"invalid code %d position %d writer %d\n",code,cv2->internal_position[i],i);
-      bummerparse:
-      if (cv2->poll_state[i]==4) {
-        cv2->poll_state[i]=3;
-	cv2->buflen[i]=0;
-//        cv2->send_buffer_ready[i]=1;
-	}
-      cv1->poll_state[i]=3;
-      cv1->buflen[i]=0;
-      return;
+  network2_packeted_command ppc;
+  network2_packeted_command *pc=&ppc;
+  network2_internal_command *this_ic = &pc->packeted_ic;
+  
+  int pos=0;
+  int maxlen = cv1->buflen[i];
+  
+  while (parse_next_packeted_command(c2,i,(volatile unsigned char *)cv1->buffers[i],&pos,maxlen,&ppc)) {
+    if (this_ic->id == 255) {}
+    else {
+      volatile network2_internal_command *icv=c2->internal_commands + this_ic->id;
+      if (pc->code==1) { // send acknowledgement
+        path_finished_sending_acknowlegement(c2,pc,icv);
+        }
+      else if (pc->code==3) { // send acknowledgement
+        path_finished_sending_command(c2,pc,icv);
+        }
+      else if (pc->code==5) { // send acknowledgement
+        path_finished_sending_redo(c2,pc,icv);
+        }
       }
-      
-    unsigned short buflen =    (unsigned short) (cv1->buffers[i][cv2->internal_position[i]+1]) | (unsigned short)(cv1->buffers[i][cv2->internal_position[i]+2]);
-    
-    if (buflen+ cv2->internal_position[i] >cv1->buflen[i]) {
-      fprintf(stderr,"invalid buffer length %d position %d writer %d\n",buflen,cv2->internal_position[i],i);
-      goto bummerparse;
-      }
-      
-      
-    if (code==1) { // ctrla -- who cares
-      cv2->internal_position[i] += buflen;
-      continue;
-      }
-
-    else if (code==3) { // ctrlc -- who cares
-      cv2->internal_position[i] += buflen;
-      continue;
-      }
-    else if (code==2) { // ctrlb -- who cares
-      cv2->internal_position[i] += buflen;
-      continue;
-      }
-    else if (code==5) { // ctrle -- who cares
-      cv2->internal_position[i] += buflen;
-      continue;
-      }
-    } // while have space
-  }  // if highest command
+    }    
+  }				
+								
 else {
   if (cv2->poll_state[i]<3) {
     cv2->poll_state[i]=3;
@@ -345,6 +800,68 @@ else {
 
 
 
+
+static void add_internal_command_state(volatile unsigned char *x,volatile network2_internal_command *ic) {
+	  unsigned char send=0;
+	  if (ic->sent_state[0]) send |=1;
+	  if (ic->sent_state[1]) send |=2;
+	  if (ic->sent_state[2]) send |=4;
+	  if (ic->sent_state[3]) send |=8;
+	  if (ic->sent_state[4]) send |=16;
+	  if (ic->sent_state[5]) send |=32;
+          *x = send;
+	  x++;
+	  unsigned char ack=0;
+	  if (ic->acknowledged_state[0]) ack |=1;
+	  if (ic->acknowledged_state[1]) ack |=2;
+	  if (ic->acknowledged_state[2]) ack |=4;
+	  if (ic->acknowledged_state[3]) ack |=8;
+	  if (ic->acknowledged_state[4]) ack |=16;
+	  if (ic->acknowledged_state[5]) ack |=32;
+          *x = ack;
+	  x++;
+	  unsigned char executed=0;
+	  if (ic->executed_state[0]) executed |=1;
+	  if (ic->executed_state[1]) executed |=2;
+	  if (ic->executed_state[2]) executed |=4;
+	  if (ic->executed_state[3]) executed |=8;
+	  if (ic->executed_state[4]) executed |=16;
+	  if (ic->executed_state[5]) executed |=32;
+          *x = executed;
+	  x++;
+          unsigned char cleared=0;
+	  if (ic->clear_state[0]) cleared |=1;
+	  if (ic->clear_state[1]) cleared |=2;
+	  if (ic->clear_state[2]) cleared |=4;
+	  if (ic->clear_state[3]) cleared |=8;
+	  if (ic->clear_state[4]) cleared |=16;
+	  if (ic->clear_state[5]) cleared |=32;
+          *x = executed;
+	  x++;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 void network12_pull_next_send_buffer_from_queue (struct network1_complete *c1,int i, int n) {
 struct network2_complete *c2 = (struct network2_complete *) c1;
 volatile struct network1_complete *cv1 = (volatile struct network1_complete *) c1;
@@ -392,8 +909,10 @@ if (cv2->poll_state[i]==3) {
     cv2_send = 1;
     }
   }
-  
-    
+ 
+if (cv2_send) {   
+  cv2->poll_state[i]=4;
+  }
   
 
 int other_send=0;
@@ -410,6 +929,7 @@ for (int j=0;j<NUMBER_OF_NETWORK1_PARTICIPANTS_TIMES_2;j++) {
 if (cv2_send && !other_send) { // simple
   memcpy((void *)c1->buffers[i],(void *)c2->buffers[i],c2->buflen[i]);
   cv1->buflen[i]=cv2->buflen[i];
+  // cv2 is tied to this and is at 4 
   return; // all done simple
   }
 else if ((!cv2_send)&&(!other_send)) { // nothing to do
@@ -421,10 +941,10 @@ else {
   
   
   if (cv2_send) {
-     unsigned short buflen =  cv2->buflen[i] + 1 + 2; // ctrlb then length low hi then characters - len includes all
-    if (cv2->buflen[i] + cv2->internal_position[i] + buflen > NETWORK2_COMMAND_MAX_LENGTH) {
-      cv2->buflen[i]=0;
-      cv2->poll_state[i]=3; // cant do it
+    unsigned short buflen =  cv2->buflen[i] + 1 + 2; // ctrlb then length low hi then characters - len includes all
+    if (cv2->internal_position[i] + buflen > NETWORK2_COMMAND_MAX_LENGTH) {
+      cv2->poll_state[i]=6; // cant do it
+      return;
       }
     else {
       cv1->buffers[i][cv2->internal_position[i]] = 2; // ctrlb
@@ -438,10 +958,26 @@ else {
       volatile network2_queue *q = &(cv2->queues_from_poll_to_send[j][i]);
       while (q->head != q->tail) {
         int head = q->head;
-	int command_id = q->command_id[head];
+        volatile network2_packeted_command *pcv = q->packeted_commands[head];
+	int command_id = pcv->packeted_ic.id;
+	
+	if (command_id==-1) {
+          unsigned short buflen =  pcv->length + 1 + 2; // ctrlb then length low hi then characters - len includes all
+          if (cv2->internal_position[i] + buflen > NETWORK2_COMMAND_MAX_LENGTH) {
+            break;
+  	    }
+ 	  /* need to send it as a 2 command */
+          cv1->buffers[i][cv2->internal_position[i]] = 2; // ctrlb
+          cv1->buffers[i][cv2->internal_position[i]+1] = (buflen&0xff); // lenght low
+          cv1->buffers[i][cv2->internal_position[i]+2] = ((buflen>>8)&0xff); // lenght high
+          memcpy((void *)(c1->buffers[i]+cv2->internal_position[i]+3),(void *)pcv->the_command,pcv->length);
+          cv2->internal_position[i]+=buflen;
+	  }
+	
+	
 	volatile network2_internal_command *ic = &(cv2->internal_commands[command_id]);
 	volatile unsigned char * internal_command_buffers = &(cv2->internal_command_buffers[command_id][0]);
-	volatile char command_code = q->command_code[head];
+	volatile char command_code = pcv->packeted_ic.code;
 	
 	int do_it=0;
 	
@@ -450,102 +986,46 @@ else {
 	else if (command_code == 1) { buflen = 1 +  2 +  2 + 1 + 1 + 1 + 1; } // ctrla len2 cmdnum2 sent ack exe clear 
 	else if (command_code == 5) { buflen = 1 +  2 +  2; } // ctrle len2 cmdnum 
 	else { // unknown command code - erase it 
+	  int oldhead = head;
 	  head = (head+1) % NETWORK2_QUEUE_SIZE;
 	  q->head = head;
+	  free((void *)q->packeted_commands[oldhead]);
+	  q->packeted_commands[oldhead]=NULL;
 	  continue;
 	  }
 	if (buflen + cv2->internal_position[i] > NETWORK2_COMMAND_MAX_LENGTH) {
           break; // try the next queue
 	  }
-        cv1->buffers[i][cv2->internal_position[i]] = command_code; // ctrlb
+        cv1->buffers[i][cv2->internal_position[i]] = command_code; // ctrla or ctrlb or ctrle
         cv1->buffers[i][cv2->internal_position[i]+1] = (buflen&0xff); // lenght low
         cv1->buffers[i][cv2->internal_position[i]+2] = ((buflen>>8)&0xff); // lenght high
-        cv1->buffers[i][cv2->internal_position[i]+3] = (command_id&0xff); // lenght low
-        cv1->buffers[i][cv2->internal_position[i]+4] = ((command_id>>8)&0xff); // lenght high
-        if (command_code==3) { 
+        cv1->buffers[i][cv2->internal_position[i]+3] = (command_id&0xff); // command id low
+        cv1->buffers[i][cv2->internal_position[i]+4] = ((command_id>>8)&0xff); // command id high
+        if (command_code==3) { // ctrlc
           cv1->buffers[i][cv2->internal_position[i]+5] = ic->network_order[0];
           cv1->buffers[i][cv2->internal_position[i]+6] = ic->network_order[1];
           cv1->buffers[i][cv2->internal_position[i]+7] = ic->network_order[2];
           cv1->buffers[i][cv2->internal_position[i]+8] = ic->network_order[3];
           cv1->buffers[i][cv2->internal_position[i]+9] = ic->network_order[4];
           cv1->buffers[i][cv2->internal_position[i]+10] = ic->network_order[5];
-	  unsigned char send=0;
-	  if (ic->sent_state[0]) send |=1;
-	  if (ic->sent_state[1]) send |=2;
-	  if (ic->sent_state[2]) send |=4;
-	  if (ic->sent_state[3]) send |=8;
-	  if (ic->sent_state[4]) send |=16;
-	  if (ic->sent_state[5]) send |=32;
-          cv1->buffers[i][cv2->internal_position[i]+11] = send;
-	  unsigned char ack=0;
-	  if (ic->acknowledged_state[0]) ack |=1;
-	  if (ic->acknowledged_state[1]) ack |=2;
-	  if (ic->acknowledged_state[2]) ack |=4;
-	  if (ic->acknowledged_state[3]) ack |=8;
-	  if (ic->acknowledged_state[4]) ack |=16;
-	  if (ic->acknowledged_state[5]) ack |=32;
-          cv1->buffers[i][cv2->internal_position[i]+12] = ack;
-	  unsigned char executed=0;
-	  if (ic->executed_state[0]) executed |=1;
-	  if (ic->executed_state[1]) executed |=2;
-	  if (ic->executed_state[2]) executed |=4;
-	  if (ic->executed_state[3]) executed |=8;
-	  if (ic->executed_state[4]) executed |=16;
-	  if (ic->executed_state[5]) executed |=32;
-          cv1->buffers[i][cv2->internal_position[i]+13] = executed;
-          unsigned char cleared=0;
-	  if (ic->clear_state[0]) cleared |=1;
-	  if (ic->clear_state[1]) cleared |=2;
-	  if (ic->clear_state[2]) cleared |=4;
-	  if (ic->clear_state[3]) cleared |=8;
-	  if (ic->clear_state[4]) cleared |=16;
-	  if (ic->clear_state[5]) cleared |=32;
-          cv1->buffers[i][cv2->internal_position[i]+14] = cleared;
-	  cv1->buffers[i][cv2->internal_position[i]+15] = q->state_number[q->head];
+	  add_internal_command_state(cv1->buffers[i]+cv2->internal_position[i]+11,ic);
+	  cv1->buffers[i][cv2->internal_position[i]+15] = pcv->this_state;
 	  memcpy((void *)(c1->buffers[i]+cv2->internal_position[i]+16),((void *)internal_command_buffers),ic->length);
           cv2->internal_position[i]+=buflen;
           } // if we are ctrlc
 	else if (command_code==1) {  // ctrla
-	  unsigned char send=0;
-	  if (ic->sent_state[0]) send |=1;
-	  if (ic->sent_state[1]) send |=2;
-	  if (ic->sent_state[2]) send |=4;
-	  if (ic->sent_state[3]) send |=8;
-	  if (ic->sent_state[4]) send |=16;
-	  if (ic->sent_state[5]) send |=32;
-          cv1->buffers[i][cv2->internal_position[i]+5] = send;
-	  unsigned char ack=0;
-	  if (ic->acknowledged_state[0]) ack |=1;
-	  if (ic->acknowledged_state[1]) ack |=2;
-	  if (ic->acknowledged_state[2]) ack |=4;
-	  if (ic->acknowledged_state[3]) ack |=8;
-	  if (ic->acknowledged_state[4]) ack |=16;
-	  if (ic->acknowledged_state[5]) ack |=32;
-          cv1->buffers[i][cv2->internal_position[i]+6] = ack;
-	  unsigned char executed=0;
-	  if (ic->executed_state[0]) executed |=1;
-	  if (ic->executed_state[1]) executed |=2;
-	  if (ic->executed_state[2]) executed |=4;
-	  if (ic->executed_state[3]) executed |=8;
-	  if (ic->executed_state[4]) executed |=16;
-	  if (ic->executed_state[5]) executed |=32;
-          cv1->buffers[i][cv2->internal_position[i]+7] = executed;
-          unsigned char cleared=0;
-	  if (ic->clear_state[0]) cleared |=1;
-	  if (ic->clear_state[1]) cleared |=2;
-	  if (ic->clear_state[2]) cleared |=4;
-	  if (ic->clear_state[3]) cleared |=8;
-	  if (ic->clear_state[4]) cleared |=16;
-	  if (ic->clear_state[5]) cleared |=32;
-          cv1->buffers[i][cv2->internal_position[i]+8] = cleared;
-	  cv1->buffers[i][cv2->internal_position[i]+9] = q->state_number[q->head];
+	  add_internal_command_state(cv1->buffers[i]+cv2->internal_position[i]+5,ic);
+	  cv1->buffers[i][cv2->internal_position[i]+9] = pcv->this_state;
           cv2->internal_position[i]+=buflen;
           }
 	else if (command_code==5) {  // ctrle
           cv2->internal_position[i]+=buflen;
           }
+	int oldhead = head;
 	head = (head+1) % NETWORK2_QUEUE_SIZE;
 	q->head = head;
+	free((void *)q->packeted_commands[oldhead]);
+	q->packeted_commands[oldhead]=NULL;
 	} // while entries in this queue to do
       } // for all queues
     }
