@@ -896,11 +896,16 @@ Set the socket to nonblocking
 
 {
   for (int i=0;i<NUMBER_OF_NETWORK1_PARTICIPANTS;i++) {
+    if (i== c->participant_number) {
+      continue;
+      }
+
     int o = i+NUMBER_OF_NETWORK1_PARTICIPANTS;
     int ptstatus;
     c->pthread_parameters[i].bind_id=i;
     c->pthread_parameters[i].c=  (volatile network1_complete *)c;
     fprintf(stderr,"starting recv thread %d %lx\n",i,(long unsigned int)  (&(c) ));
+
 
     ptstatus = pthread_create(&c->network_thread[i],NULL,network_recv_thread,(void *)(&(c->pthread_parameters[i])));
     if (ptstatus) {
