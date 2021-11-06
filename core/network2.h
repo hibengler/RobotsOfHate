@@ -94,7 +94,7 @@ network2_internal_command packeted_ic;
 unsigned char bind_id;
 unsigned char code;
 unsigned short length; // length of actual command text
-unsigned char *the_command[2048];
+unsigned char the_command[2048];
 unsigned char this_state;
 } network2_packeted_command;
 
@@ -217,5 +217,10 @@ extern int network2_add_standard_input_fd(network2_complete *c,int fd,
      network2_complete_round_call network2_get_new_receive_buffer);
 
 int rehearse_network(network2_complete *c);  /* find the other ones */
+
+
+extern int network2_path_new_command(struct network2_complete *c2,
+    unsigned char *command,int length, int initial_state, int me_bind_id, int preferred_first,int preferred_next) ;
+    
 
 #endif

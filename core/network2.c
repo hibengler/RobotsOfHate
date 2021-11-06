@@ -193,52 +193,7 @@ void network12_handle_stdin_action_round3_in_poll (struct network1_complete *c1,
   
 
 
-void network2_handle_receive_buffer_in_receive_thread(struct network2_complete *c2,int i,int n,int round) {
-volatile network1_complete *cv1 = c2->cv1;
-volatile network2_complete *cv2 = (volatile network2_complete *) c2;
 
-if (cv2->poll_state[i]<3) {
-  cv2->poll_state[i]=3;
-  }
-else if (cv2->poll_state[i]==4) {
-  cv2->poll_state[i]=3;
-  }
-while (cv2->poll_state[i]!=3) {
-waitning:
-  nsleep();
-  }
-//assume simple now.
-if (cv2->buflen[i]) {
-  goto waitning;
-  }
-cv2->poll_state[i]=4;
-if ((cv1->buffers[i])&&(cv1->buflen[i])&&(cv1->buffers[i])) {
-  memcpy((void *)c2->buffers[i],(void *)c2->c1->buffers[i],c2->c1->buflen[i]);
-  }
-cv2->buflen[i] = cv1->buflen[i];
-cv2->poll_state[i] = 5;
-
-cv1->buflen[i]=0;
-cv1->poll_state[i]=3;
-cv1->call_rounds[i]=0;
-// call the three cv2nonpoll rounds
-int called=0;
-  if (cv2->network2_handle_action_round1[i]) {
-      (*cv2->network2_handle_action_round1[i])(c2,i,1); 
-      called=1;
-      }     
-  if (cv2->network2_handle_action_round2[i]) {
-            (*cv2->network2_handle_action_round2[i])(c2,i,1); 
-      called=1;
-      }     
-  if (cv2->network2_handle_action_round3[i]) {
-            (*cv2->network2_handle_action_round3[i])(c2,i,1); 
-      called=1;
-      }     
-if (!called) cv2->call_rounds[i]=1;
-
-// hopefully c2 is back to 3, but we dont know
-}
 
 
 
@@ -262,7 +217,7 @@ unsigned char this_state = pc->this_state;
 if (icv->did_states[this_state] ==0) {
   icv->did_states[this_state] = 1;
   for (int j=0;j<NUMBER_OF_NETWORK1_PARTICIPANTS;j++) {
-    icv->acknowledged_state[j] != pc->packeted_ic.acknowledged_state[j];
+    icv->acknowledged_state[j] |= pc->packeted_ic.acknowledged_state[j];
     }
   // later have some calls that are per states
   if (this_state==NETWORK2_PATH_NOTHING_STATE_NOTHING) {
@@ -281,14 +236,15 @@ if (icv->did_states[this_state] ==0) {
 
 void path_queue_up(struct network2_complete *c2,volatile network2_packeted_command *pc,int me_bind_id,int to_bind_id) {
 volatile network2_complete *cv2 = (volatile network2_complete *)c2;
-volatile network2_queue *q =  &(cv2->queues_from_poll_to_send[to_bind_id][me_bind_id]);
+volatile network2_queue *q =  &(cv2->queues_from_poll_to_send[me_bind_id][to_bind_id]);
 while (((q->tail+1)%NETWORK2_QUEUE_SIZE) == q->head) {
   nsleep();
   }
-int tail =  ((q->tail+1)%NETWORK2_QUEUE_SIZE);
+int tail2 =  ((q->tail+1)%NETWORK2_QUEUE_SIZE);
+int tail = q->tail;
 q->packeted_commands[tail] = (network2_packeted_command *)malloc(sizeof(network2_packeted_command));
 memcpy((void *)q->packeted_commands[tail],(void *)pc,sizeof(network2_packeted_command));
-q->tail = tail;
+q->tail = tail2;
 }
 
 
@@ -313,13 +269,16 @@ return id;
 
 // only call from poll task, preferred_first and next can be -1 if it doesnt matter
 // me_bind_id = our thread, or participant_number
-int path_new_command(struct network2_complete *c2,unsigned char *command,int length, int initial_state, int me_bind_id, int preferred_first,int preferred_next) {
+int network2_path_new_command(struct network2_complete *c2,
+    unsigned char *command,int length, int initial_state, int me_bind_id, int preferred_first,int preferred_next) {
 int command_id = network2_get_free_command_number(c2,me_bind_id);
 memset((void *)(c2->internal_commands+command_id),0,sizeof(network2_internal_command));
 volatile network2_complete *cv2 = (volatile network2_complete *)c2;
 network2_packeted_command pcc;
 volatile network2_packeted_command *pcv = &pcc;
 volatile network2_internal_command *icv = &pcv->packeted_ic;
+
+memset((void *)(pcv),0,sizeof(network2_packeted_command));
 
 icv->length = length;
 icv->id = command_id;
@@ -344,17 +303,28 @@ if (preferred_first!=-1) {
   }  
   
 int  list[NUMBER_OF_NETWORK1_PARTICIPANTS];
+int  available[NUMBER_OF_NETWORK1_PARTICIPANTS];
 int count_to_do = 0;
+
+
+for (int j=0;j<NUMBER_OF_NETWORK1_PARTICIPANTS;j++) {
+   available[j]=1;
+   }
+   
+for (int j=0;j<NUMBER_OF_NETWORK1_PARTICIPANTS;j++) {
+  if (icv->network_order[j]!=255) {
+    available[icv->network_order[j]]=0;
+    }
+  }
 
 // figure out what is left to be done.
 for (int j=0;j<NUMBER_OF_NETWORK1_PARTICIPANTS;j++) {
-  if (icv->network_order[j]==-1) {
+  if (available[j]) {
     list[count_to_do] =j;
     count_to_do++;
     }
-  else {
-    }
   }
+
 
 int j;
 j = NUMBER_OF_NETWORK1_PARTICIPANTS-count_to_do;  
@@ -384,10 +354,6 @@ for (int j=0;j<NETWORK2_STATE_LENGTH;j++) {
   icv->did_states[j]=0;
   }
  
-if (initial_state < NETWORK2_STATE_LENGTH) {
-  icv->did_states[initial_state] = 1;
-  }
-
 
 
 cv2->internal_commands[command_id] = *icv;  
@@ -406,14 +372,47 @@ if ((icv->executed_state[pn])==0) {
 }
 
 
+
+
+void sync_states(struct network2_complete *c2,volatile network2_packeted_command *pcv,volatile network2_internal_command *icv) {
+for (int j=0;j<NUMBER_OF_NETWORK1_PARTICIPANTS;j++) {
+  icv->sent_state[j] |= pcv->packeted_ic.sent_state[j];
+  icv->acknowledged_state[j] |= pcv->packeted_ic.acknowledged_state[j];
+  icv->executed_state[j] |= pcv->packeted_ic.acknowledged_state[j];
+  icv->clear_state[j] |= pcv->packeted_ic.clear_state[j];
+  }
+}
+
+
+void path_possibly_execute(struct network2_complete *c2,volatile network2_packeted_command *pcv,volatile network2_internal_command *icv) {
+int j;
+int pn = c2->cv1->participant_number;
+
+
+if((icv->acknowledged_state[pn])&&(icv->executed_state[pn]==0)) { // if we got the command
+  path_queue_up(c2,pcv,icv->network_order[0],pn);
+  icv->executed_state[pn]|=1;
+  pcv->packeted_ic.executed_state[pn]|=1;
+  }
+}
+
+
 void path_finished_sending_command(struct network2_complete *c2,volatile network2_packeted_command *pc,volatile network2_internal_command *icv) {
 unsigned char this_state = pc->this_state;
+int pn = c2->cv1->participant_number;
+int i=pc->bind_id;
 if (icv->did_states[this_state] ==0) {
   icv->did_states[this_state] = 1;
   // later have some calls that are per states
   if (this_state==NETWORK2_PATH_NOTHING_STATE_NOTHING) {
+    pc->packeted_ic.sent_state[i] = 1;
+    sync_states(c2,pc,icv);
+    path_possibly_execute(c2,pc,icv);
     }
   else if (this_state==NETWORK2_PATH_SIMPLE_STATE_SIMPLE) {
+    pc->packeted_ic.sent_state[i] = 1;
+    sync_states(c2,pc,icv);
+    path_possibly_execute(c2,pc,icv);
     }
   }
 }
@@ -421,22 +420,63 @@ if (icv->did_states[this_state] ==0) {
 
 
 void path_finished_receiving_command(struct network2_complete *c2,volatile network2_packeted_command *pcv,volatile network2_internal_command *icv) {
+volatile network2_complete *cv2 = (volatile network2_complete *)c2;
 unsigned char this_state = pcv->this_state;
 int pn = c2->cv1->participant_number;
+
+// block to set the command
+int flush=0;
+if (pcv->packeted_ic.id != icv->id) {
+  flush=1;
+  }
+else if (icv->length != pcv->length) {
+  flush=1;
+  }
+else if (memcmp((void *)pcv->the_command,(void *)c2->internal_command_buffers[pcv->packeted_ic.id],pcv->length) !=0) {
+  flush=1;
+  }
+
+if (flush) {
+  *icv = pcv->packeted_ic;
+  memcpy((void *)pcv->the_command,(void *)c2->internal_command_buffers[pcv->packeted_ic.id],pcv->length);
+  }
+
+
+
+
+if (!flush) {
+  for (int j=0;j<NUMBER_OF_NETWORK1_PARTICIPANTS;j++) {
+    icv->network_order[j] = pcv->packeted_ic.network_order[j];
+    }
+  for (int j=0;j<NUMBER_OF_NETWORK1_PARTICIPANTS;j++) {
+    if (j != pn) {
+      icv->sent_state[j] |= pcv->packeted_ic.sent_state[pn];
+      icv->acknowledged_state[j] |= pcv->packeted_ic.acknowledged_state[j];
+      icv->executed_state[j] |= pcv->packeted_ic.acknowledged_state[j];
+      icv->clear_state[j] |= pcv->packeted_ic.clear_state[j];
+      }
+    }
+  }
+
+int acknowledged_before = (icv->acknowledged_state[pn]==1);
+
+// well we received it
+
+
+// havent transferred the states yet
 if (icv->did_states[this_state] ==0) {
   icv->did_states[this_state] = 1;
-  for (int j=0;j<NUMBER_OF_NETWORK1_PARTICIPANTS;j++) {
-    icv->acknowledged_state[j] |= pcv->packeted_ic.acknowledged_state[j];
-    }
-  icv->sent_state[pcv->bind_id] = 1;
-  icv->acknowledged_state[pn] = 1;
   
+  pcv->packeted_ic.acknowledged_state[pn] = 1;
+  icv->acknowledged_state[pn] = 1;
+  pcv->packeted_ic.sent_state[pn] = 1;
+  icv->sent_state[pn] = 1;
   // later have some calls that are per states
   if (this_state==NETWORK2_PATH_NOTHING_STATE_NOTHING) {
-    path_queue_execute_on_poll(c2,pcv,icv);
+    path_possibly_execute(c2,pcv,icv);
     }
   else if (this_state==NETWORK2_PATH_SIMPLE_STATE_SIMPLE) {
-    path_queue_execute_on_poll(c2,pcv,icv);
+    path_possibly_execute(c2,pcv,icv);
     }
   }
 }
@@ -519,6 +559,13 @@ x++;
 
 
 
+static int getshort(volatile unsigned char *x) {
+unsigned int a=*x;
+unsigned int b=x[1];
+unsigned int c=b*256 + a;
+return c;
+}
+
 int parse_next_packeted_command(
  struct network2_complete *c2,int bind_id,volatile unsigned char *x,int *ppos, int maxlen, volatile network2_packeted_command *pcv)  {
 
@@ -529,13 +576,31 @@ pcv->bind_id = bind_id;
 
 volatile network2_internal_command *icv = &(pcv->packeted_ic);
 
-if (*ppos >maxlen) {
+if (*ppos >=maxlen) {
   return 0;
   }
 
 int pn = c2->cv1->participant_number;
 
 if ( (x[*ppos] > NETWORK2_HIGHEST_COMMAND) ) {
+
+
+  if (1==0) {
+    badlength: fprintf(stderr,"bad length on a packet\n");
+     goto simpleq;
+    badheader: fprintf(stderr,"bad hwader witht he length too small\n");
+      goto simpleq;
+    badnetworkorder: fprintf(stderr,"bad network order\n");
+      goto simpleq;
+    badstate: fprintf(stderr,"bad assigned state out of bounds\n");
+      goto simpleq;
+    badcommandid: fprintf(stderr,"bad command id\n");
+      goto simpleq;
+
+    simpleq: 
+    goto simple;
+      }
+
 simple:
   icv->length = maxlen-*ppos +3;
   icv->id = -1;
@@ -584,15 +649,18 @@ pcv->code = icv->code;
   
 if (icv->code == 1) { // ctrl-a
   unsigned int intlen;
-  if (*ppos+2 > maxlen) {goto simple;}
-    intlen = (unsigned int)((unsigned char)x[*ppos+1]) + (unsigned int)((unsigned char)x[*ppos+2])<<8;
-  if ((intlen + *ppos) > maxlen) {goto simple;}
-  if (intlen < 10) {goto simple;}
-  icv->length = intlen;
+  if (*ppos+2 > maxlen) {goto badheader;}
+    intlen = getshort(x+*ppos+1);
+  if ((intlen + *ppos) > maxlen) {goto badlength;}
+  if (intlen < 10) {goto badheader;}
+  icv->length = intlen-10;
   
-  unsigned int  command_id = (unsigned int)((unsigned char)x[*ppos+3]) + (unsigned int)((unsigned char)x[*ppos+4])<<8;
-  if ((command_id < 0)||(command_id>=NETWORK2_NUMBER_COMMANDS)) {goto simple;}
+  unsigned int  command_id = getshort(x+*ppos+3);
+  if ((command_id < 0)||(command_id>=NETWORK2_NUMBER_COMMANDS)) {goto badcommandid;}
   icv->id = command_id;
+  
+  
+
 
   // estimate network order  
   int no=0;
@@ -624,14 +692,14 @@ if (icv->code == 1) { // ctrl-a
     }
     
   unsigned char current_position = x[*ppos+9];
-  if (current_position>=NETWORK2_STATE_LENGTH) { goto simple;}
+  if (current_position>=NETWORK2_STATE_LENGTH) { goto badstate;}
   
   icv->did_states[current_position]=1;
   
-  pcv->length = icv->length-10;
+  pcv->length = icv->length;
   pcv->this_state = current_position;
   memcpy((void *)pcv->the_command,(void *)(x+*ppos+10),pcv->length);
-  *ppos += icv->length;
+  *ppos += icv->length+10;
   return 1;
   } // ctrl-a acknowledge
 
@@ -640,11 +708,11 @@ if (icv->code == 1) { // ctrl-a
 
 if (icv->code == 2) { // ctrl-b
   unsigned int intlen;
-  if (*ppos+2 > maxlen) {goto simple;}
-    intlen = (unsigned int)((unsigned char)x[*ppos+1]) + (unsigned int)((unsigned char)x[*ppos+2])<<8;
-  if ((intlen + *ppos) > maxlen) {goto simple;}
-  if (intlen < 3) {goto simple;}
-  icv->length = intlen;
+  if (*ppos+2 > maxlen) {goto badheader;}
+    intlen = getshort(x+*ppos+1);
+  if ((intlen + *ppos) > maxlen) {goto badlength;}
+  if (intlen < 3) {goto badheader;}
+  icv->length = intlen-3;
   
   int no=0;
   int receiving=0;
@@ -676,10 +744,10 @@ if (icv->code == 2) { // ctrl-b
     icv->did_states[j]=0;
     }
   
-  pcv->length = icv->length-3;
+  pcv->length = icv->length;
   pcv->this_state = NETWORK2_PATH_SIMPLE_STATE_SIMPLE;
   memcpy((void *)pcv->the_command,(void *)(x+*ppos+3),pcv->length);
-  *ppos += icv->length;
+  *ppos += icv->length+3;
   return 1;
   }
 
@@ -690,16 +758,15 @@ if (icv->code == 2) { // ctrl-b
   
 if (icv->code == 3) { // ctrl-c
   unsigned int intlen;
-  if (*ppos+2 > maxlen) {goto simple;}
-    intlen = (unsigned int)((unsigned char)x[*ppos+1]) + (unsigned int)((unsigned char)x[*ppos+2])<<8;
-  if ((intlen + *ppos) > maxlen) {goto simple;}
-  if (intlen < 16) {goto simple;}
-  icv->length = intlen;
+  if (*ppos+2 > maxlen) {goto badheader;}
+    intlen = getshort(x+*ppos+1);
+  if ((intlen + *ppos) > maxlen) {goto badlength;}
+  if (intlen < 16) {goto badheader;}
+  icv->length = intlen-16;
 
     
-  unsigned int command_id;
-    command_id = (unsigned int)((unsigned char)x[*ppos+3]) + (unsigned int)((unsigned char)x[*ppos+4])<<8;
-  if ((command_id < 0)||(command_id>=NETWORK2_NUMBER_COMMANDS)) {goto simple;}
+  unsigned int  command_id = getshort(x+*ppos+3);
+  if ((command_id < 0)||(command_id>=NETWORK2_NUMBER_COMMANDS)) {goto badcommandid;}
   icv->id = command_id;
   
   for (int j=0;j<NUMBER_OF_NETWORK1_PARTICIPANTS;j++) {
@@ -708,7 +775,7 @@ if (icv->code == 3) { // ctrl-c
          ((icv->network_order[j]>=0)&&
           (icv->network_order[j]<NUMBER_OF_NETWORK1_PARTICIPANTS)))  {
       }
-    else { goto simple;}
+    else { goto badnetworkorder;}
     }
 	
   parse_internal_command_state(icv,(volatile unsigned char *) (x+*ppos+5));
@@ -719,14 +786,14 @@ if (icv->code == 3) { // ctrl-c
     }
     
   unsigned char current_position = x[*ppos+15];
-  if (current_position>=NETWORK2_STATE_LENGTH) { goto simple;}
+  if (current_position>=NETWORK2_STATE_LENGTH) { goto badstate;}
   
   icv->did_states[current_position]=1;
         
-  pcv->length = icv->length-16;
+  pcv->length = icv->length;
   pcv->this_state = current_position;
   memcpy((void *)pcv->the_command,(void *)(x+*ppos+16),pcv->length);
-  *ppos += icv->length;
+  *ppos += icv->length+16;
   return 1;
   }
 
@@ -735,15 +802,14 @@ if (icv->code == 3) { // ctrl-c
 
 if (icv->code == 5) { // ctrl-e
   unsigned int intlen;
-  if (*ppos+2 > maxlen) {goto simple;}
-    intlen = (unsigned int)((unsigned char)x[*ppos+1]) + (unsigned int)((unsigned char)x[*ppos+2])<<8;
-  if ((intlen + *ppos) > maxlen) {goto simple;}
-  if (intlen < 10) {goto simple;}
-  icv->length = intlen;
+  if (*ppos+2 > maxlen) {goto badheader;}
+    intlen = getshort(x+*ppos+1);
+  if ((intlen + *ppos) > maxlen) {goto badlength;}
+  if (intlen < 5) {goto badheader;}
+  icv->length = intlen-5;
   
-  unsigned int command_id;
-    command_id = (unsigned int)((unsigned char)x[*ppos+3]) + (unsigned int)((unsigned char)x[*ppos+4])<<8;
-  if ((command_id < 0)||(command_id>=NETWORK2_NUMBER_COMMANDS)) {goto simple;}
+  unsigned int  command_id = getshort(x+*ppos+3);
+  if ((command_id < 0)||(command_id>=NETWORK2_NUMBER_COMMANDS)) {goto badcommandid;}
   icv->id = command_id;
   
 
@@ -775,20 +841,128 @@ if (icv->code == 5) { // ctrl-e
     }
     
   unsigned char current_position = x[*ppos+5];
-  if (current_position>=NETWORK2_STATE_LENGTH) { goto simple;}
+  if (current_position>=NETWORK2_STATE_LENGTH) { goto badstate;}
   
   icv->did_states[current_position]=1;
   
-  pcv->length = icv->length-5;
+  pcv->length = icv->length;
   pcv->this_state = current_position;
   memcpy((void *)pcv->the_command,(void *)(x+*ppos+5),pcv->length);
-  *ppos += icv->length;
+  *ppos += icv->length+5;
   return 1;
   } // ctrl-e acknowledge
 
 
 
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+void network2_handle_receive_buffer_in_receive_thread(struct network2_complete *c2,int i,int n,int round) {
+volatile network1_complete *cv1 = c2->cv1;
+volatile network2_complete *cv2 = (volatile network2_complete *) c2;
+
+
+
+
+if (cv1->buffers[i][0] <= NETWORK2_HIGHEST_COMMAND ) {
+  network2_packeted_command ppc;
+  network2_packeted_command *pc=&ppc;
+  network2_internal_command *this_ic = &pc->packeted_ic;
+  
+  int pos=0;
+  int maxlen = cv1->buflen[i];
+  
+  while (parse_next_packeted_command(c2,i,(volatile unsigned char *)cv1->buffers[i],&pos,maxlen,&ppc)) {
+    if (this_ic->id == 255) {
+      path_queue_up(c2,(volatile network2_packeted_command *)pc,i,c2->participant_number);
+      }
+    else {
+      volatile network2_internal_command *icv=c2->internal_commands + this_ic->id;
+      if (pc->code==1) { // send acknowledgement
+        path_finished_receiving_acknowlegement(c2,pc,icv);
+        }
+      else if (pc->code==3) { // send acknowledgement
+        path_finished_receiving_command(c2,pc,icv);
+        }
+      else if (pc->code==5) { // send acknowledgement
+        path_finished_receiving_redo(c2,pc,icv);
+        }
+      }
+    } // while parsing
+  }												
+else {
+  network2_packeted_command ppc;
+  network2_packeted_command *pc=&ppc;
+  network2_internal_command *this_ic = &pc->packeted_ic;
+  memset((void *)(pc),0,sizeof(network2_packeted_command));
+  this_ic->length= cv1->buflen[i];
+  this_ic->id=255;
+  this_ic->code=2;
+  pc->length = this_ic->length;
+  pc->this_state = NETWORK2_PATH_NOTHING_STATE_NOTHING;
+  memcpy((void *)pc->the_command,(void *)cv1->buffers[i],pc->length);
+  pc->bind_id = i;
+  
+  path_queue_up(c2,(volatile network2_packeted_command *)pc,i,c2->participant_number);
+  }
+
+#ifdef oldway
+if (cv2->poll_state[i]<3) {
+  cv2->poll_state[i]=3;
+  }
+else if (cv2->poll_state[i]==4) {
+  cv2->poll_state[i]=3;
+  }
+while (cv2->poll_state[i]!=3) {
+waitning:
+  nsleep();
+  }
+//assume simple now.
+if (cv2->buflen[i]) {
+  goto waitning;
+  }
+cv2->poll_state[i]=4;
+if ((cv1->buffers[i])&&(cv1->buflen[i])&&(cv1->buffers[i])) {
+  memcpy((void *)c2->buffers[i],(void *)c2->c1->buffers[i],c2->c1->buflen[i]);
+  }
+cv2->buflen[i] = cv1->buflen[i];
+cv2->poll_state[i] = 5;
+
+cv1->buflen[i]=0;
+cv1->poll_state[i]=3;
+cv1->call_rounds[i]=0;
+// call the three cv2nonpoll rounds
+int called=0;
+  if (cv2->network2_handle_action_round1[i]) {
+      (*cv2->network2_handle_action_round1[i])(c2,i,1); 
+      called=1;
+      }     
+  if (cv2->network2_handle_action_round2[i]) {
+            (*cv2->network2_handle_action_round2[i])(c2,i,1); 
+      called=1;
+      }     
+  if (cv2->network2_handle_action_round3[i]) {
+            (*cv2->network2_handle_action_round3[i])(c2,i,1); 
+      called=1;
+      }     
+//if (!called) cv2->call_rounds[i]=1;
+#endif
+// hopefully c2 is back to 3, but we dont know
+}
+
+
+
 
 
 
@@ -809,6 +983,9 @@ if (cv1->buffers[i][0] <= NETWORK2_HIGHEST_COMMAND ) {
   
   while (parse_next_packeted_command(c2,i,(volatile unsigned char *)cv1->buffers[i],&pos,maxlen,&ppc)) {
     if (this_ic->id == 255) {
+      path_queue_up(c2,(volatile network2_packeted_command *)pc,i,c2->participant_number+NUMBER_OF_NETWORK1_PARTICIPANTS);
+    
+#ifdef oldway
       if (cv2->poll_state[i]<3) {
         cv2->poll_state[i]=3;
         }
@@ -842,13 +1019,13 @@ if (cv1->buffers[i][0] <= NETWORK2_HIGHEST_COMMAND ) {
           nsleep();
           }
         } // should be ab allocation
+#endif	
       }
     else {
       volatile network2_internal_command *icv=c2->internal_commands + this_ic->id;
       if (pc->code==1) { // send acknowledgement
         path_finished_sending_acknowlegement(c2,pc,icv);
         }
-      
       else if (pc->code==3) { // send acknowledgement
         path_finished_sending_command(c2,pc,icv);
         }
@@ -857,9 +1034,26 @@ if (cv1->buffers[i][0] <= NETWORK2_HIGHEST_COMMAND ) {
         }
       }
     } // while parsing
-  }				
-								
+  }												
 else {
+  network2_packeted_command ppc;
+  network2_packeted_command *pc=&ppc;
+  network2_internal_command *this_ic = &pc->packeted_ic;
+  memset((void *)(pc),0,sizeof(network2_packeted_command));
+  this_ic->length= cv1->buflen[i];
+  this_ic->id=255;
+  this_ic->code=2;
+  this_ic->code=2;
+  pc->length = this_ic->length;
+  pc->this_state = NETWORK2_PATH_NOTHING_STATE_NOTHING;
+  memcpy((void *)pc->the_command,(void *)c1->buffers[i],pc->length);
+  pc->bind_id = i;
+  
+  int pos=0;
+  int maxlen = cv1->buflen[i];
+  path_queue_up(c2,(volatile network2_packeted_command *)pc,i,c2->participant_number+NUMBER_OF_NETWORK1_PARTICIPANTS);
+
+#ifdef oldway
   if (cv2->poll_state[i]<3) {
     cv2->poll_state[i]=3;
 //    cv2->send_buffer_ready[i]=1;
@@ -896,6 +1090,9 @@ else {
     nsleep();
     }
   }
+#endif
+  }
+
 // done  
 cv1->call_rounds[i] = 0;
 cv1->poll_state[i] = 3;  
@@ -1059,7 +1256,9 @@ else {
       memcpy((void *)(c1->buffers[i]+cv2->internal_position[i]+3),(void *)c2->buffers[i],c2->buflen[i]);
       cv2->internal_position[i]+=buflen;
       }
+    }
     
+    {
     for (int j=0;j<NUMBER_OF_NETWORK1_PARTICIPANTS_TIMES_2;j++) {
       volatile network2_queue *q = &(cv2->queues_from_poll_to_send[j][i]);
       while (q->head != q->tail) {
@@ -1528,6 +1727,9 @@ number_to_round = 0;
 
 for (i=0;i<cv1->current_number_of_polls;i++) {
   cv2->call_rounds[i]=0;
+  if (cv2->poll_state[i]<3) {
+    cv2->poll_state[i]=3;
+    }
   if (cv2->poll_state[i]>=5) {
     cv2->call_rounds[i]=1;
     }
@@ -1535,119 +1737,89 @@ for (i=0;i<cv1->current_number_of_polls;i++) {
   }  
 
       
-if (!number_to_round) return 0;
 
-//compute_sendable_recieveables(c,0);
-//process_poll_buffer_statuses(c,1);
-
-{ // Block to process events round 1
-  
-  if (number_to_round &&(cv2->network2_action_start_round1_poll)) {
-    (*cv2->network2_action_start_round1_poll)(c2,number_to_round,number_to_round);
+for (i=0;i<cv1->current_number_of_polls;i++) {
+  if (cv2->call_rounds[i]) {    
+    if  (cv2->network2_handle_action_round1_poll[i]) { (*c2->network2_handle_action_round1_poll[i])(c2,i,number_to_round);  }
     }
-    
-  for (int i=0;i<cv1->current_number_of_polls;i++) {
-    if (cv2->call_rounds[i]) {    
-      if  (cv2->network2_handle_action_round1_poll[i]) { (*c2->network2_handle_action_round1_poll[i])(c2,i,number_to_round);  }
-      }
-    } /* while loopint through all events */
+  } /* while loopint through all events */
   
-  if ((number_to_round) &&(cv2->network2_action_finish_round1_poll)) {
-    (*cv2->network2_action_finish_round1_poll)(c2,number_to_round,number_to_round);
-    }
+int pn = c2->cv1->participant_number; 
 
+for (int j=0;j<NUMBER_OF_NETWORK1_PARTICIPANTS_TIMES_2;j++) {
+  for (i=pn;i<NUMBER_OF_NETWORK1_PARTICIPANTS_TIMES_2;i+=NUMBER_OF_NETWORK1_PARTICIPANTS) {
+    volatile network2_queue *q = &(cv2->queues_from_poll_to_send[j][i]);
+    while (q->head != q->tail) {
+      int head = q->head;
+      volatile network2_packeted_command *pcv = q->packeted_commands[head];
+      int bind_id = pcv->bind_id;
+      if (cv2->poll_state[bind_id]==3) {
+        int command_id = pcv->packeted_ic.id;
+        if (cv2->buffers[bind_id]) {
+          memcpy((void *)cv2->buffers[bind_id],(void *)pcv->the_command,pcv->length);
+          cv2->buflen[bind_id] = pcv->length;
+          cv2->poll_state[bind_id]=5;
+          if  (cv2->network2_handle_action_round1_poll[bind_id]) { 
+            (*c2->network2_handle_action_round1_poll[bind_id])(c2,bind_id,number_to_round);  
+            number_to_round++; 
+	    int oldhead = head;
+	    head = (head+1) % NETWORK2_QUEUE_SIZE;
+	    q->head = head;
+	    free((void *)q->packeted_commands[oldhead]);
+	    q->packeted_commands[oldhead]=NULL;
+	    continue;
+            }  // if we called the function - maybe ignore if there is no function
+          } // of we have buffers -  
+        } // if we have poll state on bind id 3
+      // here we cant continue on the queue, so we will break and try another queue
+      } // while we should continue on the queue
+    } // checking the inut and output queues to me, or from me. from me means we got a actual command, to me means we are done sending command
+  } // checking each queue
+#ifdef oldstuff	
+	if (command_id==-1) {
+          unsigned short buflen =  pcv->length + 1 + 2; // ctrlb then length low hi then characters - len includes all
+          if (cv2->internal_position[i] + buflen > NETWORK2_COMMAND_MAX_LENGTH) {
+            break;
+  	    }
+ 	  /* need to send it as a 2 command */
+          cv1->buffers[i][cv2->internal_position[i]] = 2; // ctrlb
+          cv1->buffers[i][cv2->internal_position[i]+1] = (buflen&0xff); // lenght low
+          cv1->buffers[i][cv2->internal_position[i]+2] = ((buflen>>8)&0xff); // lenght high
+          memcpy((void *)(c1->buffers[i]+cv2->internal_position[i]+3),(void *)pcv->the_command,pcv->length);
+          cv2->internal_position[i]+=buflen;
+	  }
+	
+	
+	volatile network2_internal_command *ic = &(cv2->internal_commands[command_id]);
+	volatile unsigned char * internal_command_buffers = &(cv2->internal_command_buffers[command_id][0]);
+	volatile char command_code = pcv->packeted_ic.code;
+	
+	int do_it=0;
+	
+	unsigned short buflen = ic->length;
+	if (command_code==3) { buflen += 1 + 2 + 2  + 6 + 4 +1; } // ctrl-d len cmdnum 0 1 2 3 4 5 order of sending send ack executed delete state_number command }
+	else if (command_code == 1) { buflen = 1 +  2 +  2 + 1 + 1 + 1 + 1; } // ctrla len2 cmdnum2 sent ack exe clear 
+	else if (command_code == 5) { buflen = 1 +  2 +  2; } // ctrle len2 cmdnum 
+	else { // unknown command code - erase it 
+	  int oldhead = head;
+	  head = (head+1) % NETWORK2_QUEUE_SIZE;
+	  q->head = head;
+	  free((void *)q->packeted_commands[oldhead]);
+	  q->packeted_commands[oldhead]=NULL;
+	  continue;
+	  }
+	if (buflen + cv2->internal_position[i] > NETWORK2_COMMAND_MAX_LENGTH) {
+          break; // try the next queue
+	  }
+        cv1->buffers[i][cv2->internal_position[i]] = command_code; // ctrla or ctrlb or ctrle
+        cv1->buffers[i][cv2->internal_position[i]+1] = (buflen&0xff); // lenght low
+        cv1->buffers[i][cv2->internal_position[i]+2] = ((buflen>>8)&0xff); // lenght high
+        cv1->buffers[i][cv2->internal_position[i]+3] = (command_id&0xff); // command id low
+        cv1->buffers[i][cv2->internal_position[i]+4] = ((command_id>>8)&0xff); // command id high
+        if (command_code==3) { // ctrlc
+          cv1->buffers[i][cv2->internal_position[i]+5] = ic->network_order[0];
+#endif
 
-  } // block to process events round 1
-
-
-// recompute number_to_round after round 1
-number_to_round=0;
-for (int i=0;i<cv1->current_number_of_polls;i++) {
-  if (cv2->call_rounds[i]) number_to_round++;
-  }
-
-//process_poll_buffer_statuses(c,0);  
-
-
-if (!number_to_round) { 
-  goto full_check_poll_loop;
-  }
-  
-
-
-{ // Block to process events round 2
-
-  if (number_to_round &&(cv2->network2_action_start_round2_poll)) {
-    (*cv2->network2_action_start_round2_poll)(c2,number_to_round,number_to_round);
-    }
-    
-  for (int i=0;i<cv1->current_number_of_polls;i++) {
-    if (cv2->call_rounds[i]) {    
-      if  (cv2->network2_handle_action_round2_poll[i]) { (*cv2->network2_handle_action_round2_poll[i])(c2,i,number_to_round);  }
-      }
-    } /* while loopint through all events */
-  
-  if ((number_to_round) &&(cv2->network2_action_finish_round2_poll)) {
-    (*cv2->network2_action_finish_round2_poll)(c2,number_to_round,number_to_round);
-    }
-
-
-  } // block to process events round 2
-  
-  
-
-// recompute number_to_round after round 2
-number_to_round=0;
-for (int i=0;i<cv1->current_number_of_polls;i++) {
-  if (cv2->call_rounds[i]) number_to_round++;
-  }
-  
-if (!number_to_round) {
-  goto full_check_poll_loop;
-  }
-  
-  
-
-
-{ // Block to process events round 3
-  
-  if (number_to_round &&(cv2->network2_action_start_round3_poll)) {
-    (*cv2->network2_action_start_round3_poll)(c2,number_to_round,number_to_round);
-    }
-    
-  for (int i=0;i<cv1->current_number_of_polls;i++) {
-    if (cv2->call_rounds[i]) {    
-      if  (cv2->network2_handle_action_round3_poll[i]) { (*cv2->network2_handle_action_round3_poll[i])(c2,i,number_to_round);  }
-      }
-    } /* while loopint through all events */
-  
-  if ((number_to_round) &&(cv2->network2_action_finish_round3_poll)) {
-    (*cv2->network2_action_finish_round3_poll)(c2,number_to_round,number_to_round);
-    }
-
-
-  } // block to process events round 3
-
-
-// recompute number_to_round after round 3 - to use later
-number_to_round=0;
-for (int i=0;i<cv1->current_number_of_polls;i++) {
-  if (cv2->call_rounds[i]) number_to_round++;
-  }
-//process_poll_buffer_statuses(c,0);  
-
-
-if (!number_to_round) {
-  goto full_check_poll_loop;
-  }
-  
-full_check_poll_loop:
-
-//network2_reset_sendables_and_stuff(c);
-//compute_sendable_recieveables(c,1);
-//process_poll_buffer_statuses(c,0);
-   
-if (!number_to_round) nsleep();
    
 return number_to_round;
 }

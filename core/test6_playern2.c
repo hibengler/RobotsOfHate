@@ -28,7 +28,7 @@ fprintf(stderr,"tet3\n");
 }
 
 
-
+int broadcast=0;
 
 void stdin_in1(struct network2_complete *c,int i, int n) {
 volatile struct network2_complete *cv = (struct network2_complete *)c;
@@ -44,6 +44,9 @@ if (cv->poll_state[i]==5) {
       if ((ch-'0') != cv->participant_number) {
         to_player=ch-'0';
         }
+      }
+    else if (ch=='~') {
+      broadcast = !broadcast;
       }
     else {
       char s[4];
@@ -244,20 +247,30 @@ while (running) {
        int l=strlen(pending_send[to_player]);
 //       fprintf(stderr,"add %d\n",l);
        if (l) {
-         strcat(convo_buffers[to_player],pending_send[to_player]);
-         if (strlen(convo_buffers[to_player])>60) {
-           strcpy(convo_buffers[to_player], convo_buffers[to_player] +strlen(convo_buffers[to_player])-60);
-           }
-	 if(cv->buflen[6+to_player]==0) { // not waiting for a send
-           strcat(cv->buffers[6+to_player],pending_send[to_player]);
-	   cv->buflen[6+to_player] = strlen(cv->buffers[6+to_player]);
-   	   pending_send[to_player][0]='\0';
- // 	   fprintf(stderr,"pending send filled len %d\n", c->buflen[6+to_player]);
-	   }
+         if (broadcast) {
+           strcat(convo_buffers[to_player],pending_send[to_player]);
+           if (strlen(convo_buffers[to_player])>60) {
+             strcpy(convo_buffers[to_player], convo_buffers[to_player] +strlen(convo_buffers[to_player])-60);
+             }
+           network2_path_new_command(c,pending_send[to_player],l,NETWORK2_PATH_SIMPLE_STATE_SIMPLE,c->participant_number,to_player,-1);
+	   pending_send[to_player][0]='\0';    
+	   } 
 	 else {
-  	   fprintf(stderr,"pending send waiting for packet to be sent, len %d\n", c->buflen[6+to_player]);
+           strcat(convo_buffers[to_player],pending_send[to_player]);
+           if (strlen(convo_buffers[to_player])>60) {
+             strcpy(convo_buffers[to_player], convo_buffers[to_player] +strlen(convo_buffers[to_player])-60);
+             }
+  	   if(cv->buflen[6+to_player]==0) { // not waiting for a send
+             strcat(cv->buffers[6+to_player],pending_send[to_player]);
+	     cv->buflen[6+to_player] = strlen(cv->buffers[6+to_player]);
+   	     pending_send[to_player][0]='\0';
+ // 	     fprintf(stderr,"pending send filled len %d\n", c->buflen[6+to_player]);
+             }
 	   }
 	 }
+       else {
+  	   fprintf(stderr,"pending send waiting for packet to be sent, len %d\n", c->buflen[6+to_player]);
+	   }
        
        } // if we can send
     
