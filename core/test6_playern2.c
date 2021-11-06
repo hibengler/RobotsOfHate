@@ -252,7 +252,7 @@ while (running) {
            if (strlen(convo_buffers[to_player])>60) {
              strcpy(convo_buffers[to_player], convo_buffers[to_player] +strlen(convo_buffers[to_player])-60);
              }
-           network2_path_new_command(c,pending_send[to_player],l,NETWORK2_PATH_SIMPLE_STATE_SIMPLE,c->participant_number,to_player,-1);
+           network2_path_new_command(c,pending_send[to_player],l,NETWORK2_PATH_BROADCAST_ALLACK_ALL,c->participant_number,to_player,-1);
 	   pending_send[to_player][0]='\0';    
 	   } 
 	 else {

@@ -87,7 +87,11 @@ unsigned char did_states[NETWORK2_STATE_LENGTH];
 
 #define NETWORK2_PATH_NOTHING_STATE_NOTHING 0
 #define NETWORK2_PATH_SIMPLE_STATE_SIMPLE 1
-#define NETWORK2_PATH_BROADCAST_ALLACK_ALL 2
+#define NETWORK2_PATH_BROADCAST_ALLACK_ALL 2 // send 0->1, then 0-2 then 0->3 then 0->4 then 0->5 then 0->6 execute,
+                                             //         1->0 ack  2->0 ack 3->0 ack 4->0 ack 5->0 ack 6->0 ack 
+#define NETWORK2_PATH_BROADCAST_ALLACK_ALL_ACK 3
+
+					     
 
 typedef struct network2_packeted_command {
 network2_internal_command packeted_ic;

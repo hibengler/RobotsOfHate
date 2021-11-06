@@ -198,40 +198,6 @@ void network12_handle_stdin_action_round3_in_poll (struct network1_complete *c1,
 
 
 
-void path_finished_sending_acknowlegement(struct network2_complete *c2,volatile network2_packeted_command *pc,volatile network2_internal_command *icv) {
-unsigned char this_state = pc->this_state;
-if (icv->did_states[this_state] ==0) {
-  icv->did_states[this_state] = 1;
-  // later have some calls that are per states
-  if (this_state==NETWORK2_PATH_NOTHING_STATE_NOTHING) {
-    }
-  else if (this_state==NETWORK2_PATH_SIMPLE_STATE_SIMPLE) {
-    }
-  }
-}
-
-
-
-void path_finished_receiving_acknowlegement(struct network2_complete *c2,volatile network2_packeted_command *pc,volatile network2_internal_command *icv) {
-unsigned char this_state = pc->this_state;
-if (icv->did_states[this_state] ==0) {
-  icv->did_states[this_state] = 1;
-  for (int j=0;j<NUMBER_OF_NETWORK1_PARTICIPANTS;j++) {
-    icv->acknowledged_state[j] |= pc->packeted_ic.acknowledged_state[j];
-    }
-  // later have some calls that are per states
-  if (this_state==NETWORK2_PATH_NOTHING_STATE_NOTHING) {
-    }
-  else if (this_state==NETWORK2_PATH_SIMPLE_STATE_SIMPLE) {
-    }
-  }
-}
-
-
-
-
-
-
 
 
 void path_queue_up(struct network2_complete *c2,volatile network2_packeted_command *pc,int me_bind_id,int to_bind_id) {
@@ -359,19 +325,13 @@ for (int j=0;j<NETWORK2_STATE_LENGTH;j++) {
 cv2->internal_commands[command_id] = *icv;  
 
 
-path_queue_up(c2,pcv,me_bind_id,icv->network_order[1]+NUMBER_OF_NETWORK1_PARTICIPANTS);
+path_queue_up(c2,pcv,pcv->bind_id,icv->network_order[1]+NUMBER_OF_NETWORK1_PARTICIPANTS);
 // queue to send it out;     
 }
 
 
 
 
-void path_queue_execute_on_poll(struct network2_complete *c2,volatile network2_packeted_command *pc,volatile network2_internal_command *icv) {
-int pn = c2->cv1->participant_number;
-if ((icv->executed_state[pn])==0) {
-  path_queue_up(c2,pc,pc->bind_id,pn);
-  }
-}
 
 
 
@@ -394,23 +354,195 @@ int pn = c2->cv1->participant_number;
 if((icv->acknowledged_state[pn])&&(icv->executed_state[pn]==0)) { // if we got the command
   pcv->bind_id = icv->network_order[0];
   path_queue_up(c2,pcv,icv->network_order[0],pn);
-  icv->executed_state[pn]|=1;
-  pcv->packeted_ic.executed_state[pn]|=1;
   }
 }
+
+
 
 void path_possibly_execute_send(struct network2_complete *c2,volatile network2_packeted_command *pcv,volatile network2_internal_command *icv) {
 int j;
 int pn = c2->cv1->participant_number;
 
 if((icv->acknowledged_state[pn])&&(icv->executed_state[pn]==0)) { // if we got the command
+  int old_bind_id = pcv->bind_id;
   pcv->bind_id = icv->network_order[0];
-  path_queue_up(c2,pcv,icv->network_order[0],pn+NUMBER_OF_NETWORK1_PARTICIPANTS);
-  icv->executed_state[pn]|=1;
-  pcv->packeted_ic.executed_state[pn]|=1;
+  path_queue_up(c2,pcv,old_bind_id,pn+NUMBER_OF_NETWORK1_PARTICIPANTS);
   }
 }
 
+
+
+
+
+
+
+typedef  void (*network2_path_call)(struct network2_complete *,volatile network2_packeted_command *,volatile network2_internal_command *);
+
+typedef struct network2_callset {
+  network2_path_call receiving_command;
+  network2_path_call sending_command;
+  network2_path_call receiving_acknowledgement;
+  network2_path_call sending_acknowledgement;
+  network2_path_call receiving_redo;
+  network2_path_call sending_redo;
+  } network2_callset;
+  
+  
+
+
+  
+    
+
+void path_finished_sending_command_simple(struct network2_complete *c2,volatile network2_packeted_command *pc,volatile network2_internal_command *icv) {
+unsigned char this_state = pc->this_state;
+int pn = c2->cv1->participant_number;
+int i=pc->bind_id;
+int communicator = c2->communicator[i];
+icv->did_states[this_state] = 1;
+pc->packeted_ic.sent_state[communicator] = 1;
+sync_states(c2,pc,icv);
+path_possibly_execute_send(c2,pc,icv);
+}
+
+
+
+void path_finished_receiving_command_simple(struct network2_complete *c2,volatile network2_packeted_command *pcv,volatile network2_internal_command *icv) {
+volatile network2_complete *cv2 = (volatile network2_complete *)c2;
+unsigned char this_state = pcv->this_state;
+int pn = c2->cv1->participant_number;
+
+
+int acknowledged_before = (icv->acknowledged_state[pn]==1);
+// well we received it
+
+icv->did_states[this_state] = 1;
+  
+pcv->packeted_ic.acknowledged_state[pn] = 1;
+icv->acknowledged_state[pn] = 1;
+pcv->packeted_ic.sent_state[pn] = 1;
+icv->sent_state[pn] = 1;
+  
+// later have some calls that are per states
+path_possibly_execute(c2,pcv,icv);
+}
+
+        
+
+  
+      
+    
+
+void path_finished_sending_command_allack_all(struct network2_complete *c2,volatile network2_packeted_command *pcv,volatile network2_internal_command *icv) {
+unsigned char this_state = pcv->this_state;
+int pn = c2->cv1->participant_number;
+int i=pcv->bind_id;
+int communicator = c2->communicator[i];
+pcv->packeted_ic.sent_state[communicator] = 1;
+sync_states(c2,pcv,icv);
+pcv->packeted_ic = *icv;
+int old_bind_id = pcv->bind_id;
+if (communicator == pcv->packeted_ic.network_order[1]) { // send all the others
+  for (int j=2;j<NUMBER_OF_NETWORK1_PARTICIPANTS;j++) {
+    pcv->bind_id = pcv->packeted_ic.network_order[j]+NUMBER_OF_NETWORK1_PARTICIPANTS;
+    path_queue_up(c2,pcv,old_bind_id,pcv->bind_id);
+    }
+  icv->did_states[this_state] = 1;
+  }
+//path_possibly_execute_send(c2,pcv,icv);
+}
+
+
+void path_finished_receiving_command_allack_all(struct network2_complete *c2,volatile network2_packeted_command *pcv,volatile network2_internal_command *icv) {
+volatile network2_complete *cv2 = (volatile network2_complete *)c2;
+unsigned char this_state = pcv->this_state;
+int pn = c2->cv1->participant_number;
+
+
+int acknowledged_before = (icv->acknowledged_state[pn]==1);
+// well we received it
+
+icv->did_states[this_state] = 1;
+pcv->packeted_ic.sent_state[pn] = 1;
+
+icv->sent_state[pn] = 1;
+if (icv->acknowledged_state[pn]==0) {
+  pcv->packeted_ic = *icv;
+  
+  pcv->code = 1; // make this an acknowledgement
+  pcv->this_state = NETWORK2_PATH_BROADCAST_ALLACK_ALL;
+  int old_bind_id = pcv->bind_id;
+  int communicator = c2->communicator[old_bind_id];
+  pcv->bind_id = pcv->packeted_ic.network_order[0]+NUMBER_OF_NETWORK1_PARTICIPANTS;
+  path_queue_up(c2,pcv,old_bind_id,pcv->bind_id);
+  icv->acknowledged_state[pn]=1;
+  }
+    
+// note - we can do this after s4ending the ack
+path_possibly_execute(c2,pcv,icv);
+}
+
+
+
+
+void path_finished_receiving_acknowledgement_allack_all(struct network2_complete *c2,volatile network2_packeted_command *pcv,volatile network2_internal_command *icv) {
+volatile network2_complete *cv2 = (volatile network2_complete *)c2;
+unsigned char this_state = pcv->this_state;
+int pn = c2->cv1->participant_number;
+
+int acknowledged_before = (icv->acknowledged_state[pn]==1);
+// well we received it
+
+
+
+icv->did_states[this_state] = 1;
+pcv->packeted_ic.sent_state[pn] = 1;
+
+icv->sent_state[pn] = 1;
+icv->acknowledged_state[pn] = 1;
+
+int count_acknowledged = 0;
+for (int j=0;j<NUMBER_OF_NETWORK1_PARTICIPANTS;j++) {
+  if (icv->acknowledged_state[j])  count_acknowledged++;
+  }
+if (count_acknowledged >=3) {
+  pcv->packeted_ic = *icv;
+  pcv->length = icv->length;
+  memcpy((void *)pcv->the_command,(void *)cv2->internal_command_buffers[icv->id],(size_t)icv->length);  
+  pcv->code = 3; // make this an command
+  pcv->this_state = NETWORK2_PATH_BROADCAST_ALLACK_ALL;
+  path_possibly_execute_send(c2,pcv,icv);
+  }
+}
+
+
+        
+
+    
+  
+  
+#define NETWORK2_NUMBER_IMPLEMENTED_STATES 3
+network2_callset network2_path_callsets[] = {
+   (network2_callset) {receiving_command:path_finished_receiving_command_simple,sending_command:path_finished_receiving_command_simple,
+    receiving_acknowledgement:NULL,sending_acknowledgement:NULL,
+    receiving_redo:NULL,sending_redo:NULL}, 								// NETWORK2_PATH_NOTHING_STATE_NOTHING
+   (network2_callset) {receiving_command:path_finished_receiving_command_simple,sending_command:path_finished_receiving_command_simple,
+    receiving_acknowledgement:NULL,sending_acknowledgement:NULL,
+    receiving_redo:NULL,sending_redo:NULL},								// NETWORK2_PATH_SIMPLE_STATE_SIMPLE
+   (network2_callset) {receiving_command:path_finished_receiving_command_allack_all,sending_command:path_finished_sending_command_allack_all,
+    receiving_acknowledgement:NULL,sending_acknowledgement:NULL,
+    receiving_redo:NULL,sending_redo:NULL},								// NETWORK2_PATH_BROADCAST_ALLACK_ALL
+   (network2_callset) {receiving_command:NULL,sending_command:NULL,
+    receiving_acknowledgement:path_finished_receiving_acknowledgement_allack_all,sending_acknowledgement:NULL,
+    receiving_redo:NULL,sending_redo:NULL}};								// NETWORK2_PATH_BROADCAST_ALLACK_ALL
+    
+// next is NETWORK2_PATH_BROADCAST_ALLACK_ALL_ACK
+
+
+
+
+
+  
+    
 
 void path_finished_sending_command(struct network2_complete *c2,volatile network2_packeted_command *pc,volatile network2_internal_command *icv) {
 unsigned char this_state = pc->this_state;
@@ -418,26 +550,24 @@ int pn = c2->cv1->participant_number;
 int i=pc->bind_id;
 int communicator = c2->communicator[i];
 if (icv->did_states[this_state] ==0) {
-  icv->did_states[this_state] = 1;
-  // later have some calls that are per states
-  if (this_state==NETWORK2_PATH_NOTHING_STATE_NOTHING) {
-    pc->packeted_ic.sent_state[communicator] = 1;
-    sync_states(c2,pc,icv);
-    path_possibly_execute_send(c2,pc,icv);
+  if (this_state<NETWORK2_NUMBER_IMPLEMENTED_STATES) {
+    if (network2_path_callsets[this_state].sending_command) {
+      (network2_path_callsets[this_state].sending_command)(c2,pc,icv);
+      }
     }
-  else if (this_state==NETWORK2_PATH_SIMPLE_STATE_SIMPLE) {
-    pc->packeted_ic.sent_state[communicator] = 1;
-    sync_states(c2,pc,icv);
-    path_possibly_execute_send(c2,pc,icv);
-    }
-  }
+  }  
+return;
 }
+
+
+
 
 
 
 void path_finished_receiving_command(struct network2_complete *c2,volatile network2_packeted_command *pcv,volatile network2_internal_command *icv) {
 volatile network2_complete *cv2 = (volatile network2_complete *)c2;
 unsigned char this_state = pcv->this_state;
+
 int pn = c2->cv1->participant_number;
 
 // block to set the command
@@ -457,9 +587,6 @@ if (flush) {
   memcpy((void *)c2->internal_command_buffers[pcv->packeted_ic.id],(void *)pcv->the_command,pcv->length);
   }
 
-
-
-
 if (!flush) {
   for (int j=0;j<NUMBER_OF_NETWORK1_PARTICIPANTS;j++) {
     icv->network_order[j] = pcv->packeted_ic.network_order[j];
@@ -472,32 +599,53 @@ if (!flush) {
       icv->clear_state[j] |= pcv->packeted_ic.clear_state[j];
       }
     }
+    
+  for (int j=0;j<NETWORK2_STATE_LENGTH;j++) {
+    icv->did_states[j] |= pcv->packeted_ic.did_states[j];
+    }
   }
 
-int acknowledged_before = (icv->acknowledged_state[pn]==1);
+//int acknowledged_before = (icv->acknowledged_state[pn]==1);
 
 // well we received it
 
 
 // havent transferred the states yet
 if (icv->did_states[this_state] ==0) {
-  icv->did_states[this_state] = 1;
-  
-  pcv->packeted_ic.acknowledged_state[pn] = 1;
-  icv->acknowledged_state[pn] = 1;
-  pcv->packeted_ic.sent_state[pn] = 1;
-  icv->sent_state[pn] = 1;
-  // later have some calls that are per states
-  if (this_state==NETWORK2_PATH_NOTHING_STATE_NOTHING) {
-    path_possibly_execute(c2,pcv,icv);
-    }
-  else if (this_state==NETWORK2_PATH_SIMPLE_STATE_SIMPLE) {
-    path_possibly_execute(c2,pcv,icv);
+  if (network2_path_callsets[this_state].receiving_command) {
+    (network2_path_callsets[this_state].receiving_command)(c2,pcv,icv);
     }
   }
 }
 
 
+void path_finished_sending_acknowlegement(struct network2_complete *c2,volatile network2_packeted_command *pc,volatile network2_internal_command *icv) {
+unsigned char this_state = pc->this_state;
+if (icv->did_states[this_state] ==0) {
+//  icv->did_states[this_state] = 1;
+  }
+}
+
+
+
+void path_finished_receiving_acknowlegement(struct network2_complete *c2,volatile network2_packeted_command *pcv,volatile network2_internal_command *icv) {
+unsigned char this_state = pcv->this_state;
+if ((icv->id != pcv->packeted_ic.id)||(icv->length==0)) {return;}
+int pn = c2->cv1->participant_number;
+    
+for (int j=0;j<NUMBER_OF_NETWORK1_PARTICIPANTS;j++) {
+  if (j != pn) {
+    icv->sent_state[j] |= pcv->packeted_ic.sent_state[pn];
+    icv->acknowledged_state[j] |= pcv->packeted_ic.acknowledged_state[j];
+    icv->executed_state[j] |= pcv->packeted_ic.executed_state[j];
+    icv->clear_state[j] |= pcv->packeted_ic.clear_state[j];
+    }
+  }
+if (network2_path_callsets[this_state].receiving_acknowledgement) {
+   (network2_path_callsets[this_state].receiving_acknowledgement)(c2,pcv,icv);
+  }
+return;
+}
 
 
 
@@ -1787,16 +1935,29 @@ for (int j=0;j<NUMBER_OF_NETWORK1_PARTICIPANTS_TIMES_2;j++) {
       int head = q->head;
       volatile network2_packeted_command *pcv = q->packeted_commands[head];
       int bind_id = pcv->bind_id;
+      int communicator = c2->communicator[i];
+      
       test1();
+      int command_id = pcv->packeted_ic.id;
+      if (command_id != 255) {
+        if (cv2->internal_commands[command_id].executed_state[communicator]) {
+  	  // skip it
+          goto skip_it_already_executed;
+	  }
+	}
+	
       if ((cv2->poll_state[bind_id]==3)||(cv2->poll_state[bind_id]==4)) {
-        int command_id = pcv->packeted_ic.id;
         if (cv2->buffers[bind_id]) {
           memcpy((void *)cv2->buffers[bind_id],(void *)pcv->the_command,pcv->length);
           cv2->buflen[bind_id] = pcv->length;
           cv2->poll_state[bind_id]=5;
           if  (cv2->network2_handle_action_round1_poll[bind_id]) { 
             (*c2->network2_handle_action_round1_poll[bind_id])(c2,bind_id,number_to_round);  
-            number_to_round++; 
+	   if (command_id != 255) {  // might not b finished, but it is started
+	     cv2->internal_commands[command_id].executed_state[communicator]=1;
+	     }
+            skip_it_already_executed:
+	    number_to_round++; 
 	    int oldhead = head;
 	    head = (head+1) % NETWORK2_QUEUE_SIZE;
 	    q->head = head;
