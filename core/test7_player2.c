@@ -23,6 +23,10 @@
 
 
 
+
+
+
+
 // silentradiancesimple:
        #include "silentradiancesimple.h"
         #include "simple_packet_summary.h"
@@ -138,6 +142,15 @@ multMatrix(&tempMVMatrix,&onec->modelMatrix,&onec->viewMatrix);
 multMatrix(&onec->origin_matrix,&tempMVMatrix,&onec->projectionMatrix);
 }   
 
+
+
+static int start_rand() {
+struct timespec a;
+clock_gettime(CLOCK_REALTIME_COARSE,(struct timespec *)&a);
+srand((unsigned int)(a.tv_sec+a.tv_nsec));
+}
+
+ 
 
 static void activate_matrix_handle(int matrix_handle) {
     glUniformMatrix4fv(matrix_handle,1,0,(GLfloat *)&onec->MVPMatrix);
@@ -815,6 +828,9 @@ int main(int argc,char *argv[]) {
 
 //???system("stty raw -echo");
 
+
+start_rand();
+
 int participant_number = participant_number % 6;
 participant_number = argv[7][0]-'0';
 GLuint  screen_width = 2100;
@@ -826,8 +842,8 @@ if (participant_number==5) {
   screen_height = 2100;
   }
 else {
-  screen_width = 1024;
-  screen_height = 1024;
+  screen_width = 760;
+  screen_height = 760;
   }
 
     GLFWwindow* window;

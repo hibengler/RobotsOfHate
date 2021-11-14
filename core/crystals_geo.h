@@ -337,3 +337,59 @@ static const GLushort cubeIndices[36] = //GL_TRIANGLE_STRIP version- see glDrawE
  };
  
 
+
+
+
+
+
+
+
+static GLuint dodecahedronVertCount = 20;
+static GLuint dodecahedronIndCount =60;
+
+#define dodecv(a,b,c) a,b,c,
+#define dodecf(a,b,c,d,e) a,b,c,d,e,
+
+
+// credit due to https://www.reddit.com/r/opengl/comments/mqp63d/creating_dodecahedron/
+
+static int dodecahedronFrags[] = {
+dodecf(1,2,16,5,13)
+dodecf(1,13,9,10,14)
+dodecf(1,14,6,15,2)
+dodecf(2,15,11,12,16)
+dodecf(3,4,18,8,17)
+dodecf(3,17,12,11,20)
+dodecf(3,20,7,19,4)
+dodecf(19,10,9,18,4)
+dodecf(16,12,17,8,5)
+dodecf(5,8,18,9,13)
+dodecf(14,10,19,7,6)
+dodecf(6,7,20,11,15)
+};
+
+
+
+static GLfloat dodecahedronVertsx[] =
+        {
+dodecv (0, 0.618, 1.618)
+dodecv (0, -0.618, 1.618)
+dodecv (0, -0.618, -1.618)
+dodecv (0, 0.618, -1.618)
+dodecv (1.618, 0, 0.618)
+dodecv (-1.618, 0, 0.618)
+dodecv (-1.618, 0, -0.618)
+dodecv (1.618, 0, -0.618)
+dodecv (0.618, 1.618, 0)
+dodecv (-0.618, 1.618, 0)
+dodecv (-0.618, -1.618, 0)
+dodecv (0.618, -1.618, 0)
+dodecv (1, 1, 1)
+dodecv (-1, 1, 1)
+dodecv (-1, -1, 1)
+dodecv (1, -1, 1)
+dodecv (1, -1, -1)
+dodecv (1, 1, -1)
+dodecv (-1, 1, -1)
+dodecv (-1, -1, -1)
+        };

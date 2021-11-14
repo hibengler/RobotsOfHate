@@ -965,6 +965,284 @@ video_planet_data *dat = planetg->final;
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+video_planet the_video_planet_dodecahedron;
+
+
+
+
+
+void video_planet_init_dodecahedron(hate_rps actual_rps,int *rps_view,float color_saturation, float *other_color) {
+
+video_planet *planetg = &the_video_planet_dodecahedron;
+
+
+memset((void *)planetg,0,sizeof(video_planet));
+
+planetg->base = allocate_video_data(DODECAHEDRON_VERTEXES,DODECAHEDRON_INDEXES);
+
+
+
+glGenBuffers(1,&planetg->gl_vertex_buf);
+checkGlError("getvertex");
+glBindBuffer(GL_ARRAY_BUFFER,planetg->gl_vertex_buf);
+
+
+for (int i=0;i<20;i++) {
+  planetg->base->vertexes[i*4] = dodecahedronVertsx[i*3];
+  planetg->base->vertexes[i*4+1] = dodecahedronVertsx[i*3+1];
+  planetg->base->vertexes[i*4+2] = dodecahedronVertsx[i*3+2];
+  planetg->base->vertexes[i*4+3] = 1.f;
+  }
+int cert = 20;
+
+int v=0;  
+for (int i=0;i<12;i++) {
+  int *f = &dodecahedronFrags[i*5];
+  f[0]--;
+  f[1]--;
+  f[2]--;
+  f[3]--;
+  f[4]--;
+  
+  float vsum[4]={0.f,0.f,0.f,0.f};
+  for (int j=0;j<5;j++) {
+    float *v = &planetg->base->vertexes[f[j]*4];
+    vsum[0] += v[0];
+    vsum[1] += v[1];
+    vsum[2] += v[2];
+    vsum[3] += v[3];
+    }
+//  fprintf(stderr,"	sum %d %f,%f,%f   %f\n",i,vsum[0]*0.2,vsum[1]*0.2,vsum[2]*0.2,vsum[3]*0.2);
+  planetg->base->vertexes[cert*4] = vsum[0]*0.2;
+  planetg->base->vertexes[cert*4+1] = vsum[1]*0.2;
+  planetg->base->vertexes[cert*4+2] = vsum[2]*0.2;
+  planetg->base->vertexes[cert*4+3] = 1.f;
+  
+  
+  
+  planetg->base->indexes[v++] = f[0];
+  planetg->base->indexes[v++] = f[1];
+  planetg->base->indexes[v++] = cert;
+  planetg->base->indexes[v++] = f[1];
+  planetg->base->indexes[v++] = f[2];
+  planetg->base->indexes[v++] = cert;
+  planetg->base->indexes[v++] = f[2];
+  planetg->base->indexes[v++] = f[3];
+  planetg->base->indexes[v++] = cert;
+  planetg->base->indexes[v++] = f[3];
+  planetg->base->indexes[v++] = f[4];
+  planetg->base->indexes[v++] = cert;
+  planetg->base->indexes[v++] = f[4];
+  planetg->base->indexes[v++] = f[0];
+  planetg->base->indexes[v++] = cert;
+  
+  cert++;
+  }
+planetg->base->number_vertexes = cert;
+planetg->base->number_indexes = v;
+
+for (int i=0;i<planetg->base->number_vertexes;i++) {
+  float *v = &planetg->base->vertexes[i*4];
+  v[0] = v[0] / sqrtf(3.0);
+  v[1] = v[1] / sqrtf(3.0);
+  v[2] = v[2] / sqrtf(3.0);
+  }
+   
+
+
+generate_colors(planetg->base,actual_rps,rps_view,color_saturation,other_color);
+
+transfer_vertexes_to_indexes(planetg->base);
+
+video_planet_data *intermediate = expand_detail_video_data(NULL,planetg->base);
+video_planet_data *intermediate2 = expand_detail_video_data(NULL,intermediate);
+//video_planet_data *intermediate3 = expand_detail_video_data(NULL,intermediate2);
+planetg->expanded = expand_detail_video_data(NULL,intermediate2);
+transfer_vertexes_to_indexes(planetg->expanded);
+
+free_video_data(intermediate);
+free_video_data(intermediate2);
+//free_video_data(intermediate3);
+
+planetg->final = copy_video_data(planetg->expanded);
+
+init_rotation(planetg);
+
+glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat)*4*planetg->final->number_indexes, planetg->final->final_vertexes, GL_DYNAMIC_DRAW);
+checkGlError("c");
+glVertexAttribPointer(onec->mPositionHandle, 4, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
+glEnableVertexAttribArray(onec->mPositionHandle);
+checkGlError("d"); 
+glBindBuffer(GL_ARRAY_BUFFER, 0);
+checkGlError("e");
+
+}
+
+
+
+
+static void video_planet_step3_dodecahedron(hate_game *game,int planet_id) {
+video_planet *planetg = &the_video_planet_dodecahedron;
+rotation_step(game,planet_id,planetg);
+
+}
+
+
+static void video_planet_draw3_dodecahedron(hate_game *game,hate_screen *screen,int planet_id) {
+int show_planet = screen->planet_choices[planet_id];
+video_planet *planetg = &the_video_planet_dodecahedron;
+video_planet_data *dat = planetg->final;
+// assuming using onecolor porgaam
+
+
+        glBindBuffer(GL_ARRAY_BUFFER, planetg->gl_vertex_buf);
+        glUniform4f(onec->colorHandle, 1.0f,1.0f,0.0f,1.0f);
+    glVertexAttribPointer(onec->mPositionHandle, 4, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
+    glEnableVertexAttribArray(onec->mPositionHandle);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat)*4*dat->number_indexes, dat->final_vertexes, GL_DYNAMIC_DRAW);
+    glDrawArrays(GL_LINE_STRIP, 0, dat->number_indexes);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
+
+
+
+
+
+
+
+video_planet the_video_planet_icosahedron;
+
+
+
+
+
+void video_planet_init_icosahedron(hate_rps actual_rps,int *rps_view,float color_saturation, float *other_color) {
+
+video_planet *planetg = &the_video_planet_icosahedron;
+
+
+memset((void *)planetg,0,sizeof(video_planet));
+
+planetg->base = allocate_video_data(ICOSAHEDRON_VERTEXES,ICOSAHEDRON_INDEXES);
+
+
+
+glGenBuffers(1,&planetg->gl_vertex_buf);
+checkGlError("getvertex");
+glBindBuffer(GL_ARRAY_BUFFER,planetg->gl_vertex_buf);
+
+
+for (int i=0;i<planetg->base->number_indexes;i++) {
+  planetg->base->indexes[i] = icosahedronIndices[i];
+  }
+for (int i=0;i<planetg->base->number_vertexes;i++) {
+  planetg->base->vertexes[i*4] = icosahedronVertsx[i*3];
+  planetg->base->vertexes[i*4+1] = icosahedronVertsx[i*3+1];
+  planetg->base->vertexes[i*4+2] = icosahedronVertsx[i*3+2];
+  planetg->base->vertexes[i*4+3] = 1.f;
+  }
+    
+
+generate_colors(planetg->base,actual_rps,rps_view,color_saturation,other_color);
+
+transfer_vertexes_to_indexes(planetg->base);
+
+video_planet_data *intermediate = expand_detail_video_data(NULL,planetg->base);
+video_planet_data *intermediate2 = expand_detail_video_data(NULL,intermediate);
+//video_planet_data *intermediate3 = expand_detail_video_data(NULL,intermediate2);
+planetg->expanded = expand_detail_video_data(NULL,intermediate2);
+transfer_vertexes_to_indexes(planetg->expanded);
+
+free_video_data(intermediate);
+free_video_data(intermediate2);
+//free_video_data(intermediate3);
+
+planetg->final = copy_video_data(planetg->expanded);
+
+init_rotation(planetg);
+
+glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat)*4*planetg->final->number_indexes, planetg->final->final_vertexes, GL_DYNAMIC_DRAW);
+checkGlError("c");
+glVertexAttribPointer(onec->mPositionHandle, 4, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
+glEnableVertexAttribArray(onec->mPositionHandle);
+checkGlError("d"); 
+glBindBuffer(GL_ARRAY_BUFFER, 0);
+checkGlError("e");
+
+}
+
+
+
+
+static void video_planet_step4_icosahedron(hate_game *game,int planet_id) {
+video_planet *planetg = &the_video_planet_icosahedron;
+rotation_step(game,planet_id,planetg);
+
+
+video_planet_data *e = planetg->expanded;
+video_planet_data *f = planetg->final;
+ 
+for(int i=0;i<e->number_vertexes;i++) {
+  float factor = 0.97f + ((float)((unsigned int)(rand())&65535))* 0.05f/65535.f;
+  f->vertexes[i*4]= e->vertexes[i*4] * factor;
+  f->vertexes[i*4+1]= e->vertexes[i*4+1] * factor;
+  f->vertexes[i*4+2]= e->vertexes[i*4+2] * factor;
+  }
+transfer_vertexes_to_indexes(f);
+
+}
+
+
+static void video_planet_draw4_icosahedron(hate_game *game,hate_screen *screen,int planet_id) {
+int show_planet = screen->planet_choices[planet_id];
+video_planet *planetg = &the_video_planet_icosahedron;
+video_planet_data *dat = planetg->final;
+// assuming using onecolor porgaam
+
+
+        glBindBuffer(GL_ARRAY_BUFFER, planetg->gl_vertex_buf);
+        glUniform4f(onec->colorHandle, 1.0f,0.0f,1.0f,1.0f);
+    glVertexAttribPointer(onec->mPositionHandle, 4, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
+    glEnableVertexAttribArray(onec->mPositionHandle);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat)*4*dat->number_indexes, dat->final_vertexes, GL_DYNAMIC_DRAW);
+    glDrawArrays(GL_LINE_STRIP, 0, dat->number_indexes);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 static video_planet *all_video_planets[5];
 
 
@@ -993,15 +1271,21 @@ other_color[3]=1.f;
 video_planet_init_tetrahedron(actual_rps,rps_view,color_saturation, other_color);
 video_planet_init_cube(actual_rps,rps_view,color_saturation, other_color);
 video_planet_init_diamond(actual_rps,rps_view,color_saturation, other_color);
-
+video_planet_init_dodecahedron(actual_rps,rps_view,color_saturation, other_color);
+video_planet_init_icosahedron(actual_rps,rps_view,color_saturation, other_color);
 
 all_video_planets[0] = &the_video_planet_tetrahedron; 
 all_video_planets[1] = &the_video_planet_cube; 
 all_video_planets[2] = &the_video_planet_diamond; 
-all_video_planets[3] = NULL;
-all_video_planets[4] = NULL;
+all_video_planets[3] = &the_video_planet_dodecahedron;
+all_video_planets[4] = &the_video_planet_icosahedron;
 
 }
+
+
+
+
+
 
 
 
@@ -1023,6 +1307,10 @@ static float pos_translate[] = {0.f,0.f,0.f,
                      1.f,-1.f,0.f,
                      -1.f,-1.f,0.f,
                      -1.f,1.f,0.f};
+
+
+
+
 
 
 
@@ -1059,8 +1347,14 @@ if (show_planet==0) {
 else if (show_planet==1) {
   video_planet_draw1_cube(game,screen,planet_id);
   }
-else {
+else if (show_planet==2) {
   video_planet_draw2_diamond(game,screen,planet_id);
+  }
+else if (show_planet==4) {
+  video_planet_draw4_icosahedron(game,screen,planet_id);
+  }
+else {
+  video_planet_draw3_dodecahedron(game,screen,planet_id);
   }
 }
 
@@ -1073,7 +1367,23 @@ void video_planet_step(hate_game *game) {
   video_planet_step0_tetrahedron(game,0);
   video_planet_step1_cube(game,1);
   video_planet_step2_diamond(game,2);
+  video_planet_step3_dodecahedron(game,3);
+  video_planet_step4_icosahedron(game,4);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
