@@ -266,6 +266,10 @@ owning
 
 
 extern void player2_game_init(hate_game *game,int my_player_id);
+extern void player2_init_graphics(hate_game *game);
+// graphics is after game is init, and called after the graphics is set up
+
+
 extern void player2_game_step(hate_game *game);
 extern void player2_game_draw(hate_game *game);
 

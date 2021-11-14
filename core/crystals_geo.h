@@ -264,6 +264,16 @@ static GLfloat lineHexColors[48] =
 	{ 0.0f, -1.0f, 0.0f }, 
 	{ 0.0f, 0.0f, -1.0f } 
 	}; 
+ GLfloat octahedronIndices[24] = {
+	0,1,2,
+	0,1,5,
+	1,2,3,
+	2,3,4,
+	3,4,5,
+	1,5,3,
+	4,5,0,
+	5,0,1
+	};
 
 
         

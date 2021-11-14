@@ -1,5 +1,10 @@
 xterm -fg black -bg pink -geometry 120x49+20+20 	-e " ./test7_player2  10.20.1.2 10.20.1.2 10.20.1.2 10.20.1.2 10.20.1.5 10.20.1.5 0 2>a0" &
 
+gdb ./test7_player2
+r  10.20.1.2 10.20.1.2 10.20.1.2 10.20.1.2 10.20.1.5 10.20.1.5 0
+
+
+
 xterm -fg black -bg pink -geometry 120x49+20+20 	-e " ./test6_playern2  10.20.1.2 10.20.1.2 10.20.1.2 10.20.1.2 10.20.1.5 10.20.1.5 0 2>a0" &
 xterm -fg black -bg pink -geometry 120x49+20+20 	-e " ./test6_playern2  10.20.1.2 10.20.1.2 10.20.1.2 10.20.1.2 10.20.1.5 10.20.1.5 0 2>a0" &
 xterm -fg black -bg orange -geometry 120x49+750+20 	-e " ./test6_playern2  10.20.1.2 10.20.1.2 10.20.1.2 10.20.1.2 10.20.1.5 10.20.1.5 1 2>a1" &

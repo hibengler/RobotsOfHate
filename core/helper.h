@@ -23,6 +23,7 @@ typedef struct{
     GLfloat mat[4][4];
     } glMatrix;
 
+#define NDEBUG
 
 #ifdef NDEBUG
 #define checkGlError(dfdff) (0)

@@ -38,11 +38,11 @@ for (int i=0;i<dat->number_indexes;i++) {
   dat->final_vertexes[i*4+3]=1.f;
   
   
-
-  dat->final_colors[i*4]=dat->colors[i*4];
-  dat->final_colors[i*4+1]=dat->colors[i*4+1];
-  dat->final_colors[i*4+2]=dat->colors[i*4+2];
-  dat->final_colors[i*4+3]=dat->colors[i*4+3];
+  int ic = i/3;
+  dat->final_colors[i*4]=dat->colors[ic*4];
+  dat->final_colors[i*4+1]=dat->colors[ic*4+1];
+  dat->final_colors[i*4+2]=dat->colors[ic*4+2];
+  dat->final_colors[i*4+3]=dat->colors[ic*4+3];
   }
 }
 
@@ -111,8 +111,8 @@ info->water_ratio = ((float)water_choice_amt) / 65536.f;
 
 int actual_number_water = 0;
 
-for (int i=0;info->number_triangles;i++) {
-  unsigned int water_choice = (rand()) & 65536;
+for (int i=0;i<info->number_triangles;i++) {
+  unsigned int water_choice = (rand()) & 65535;
   if (water_choice < water_choice_amt) {
     info->types[i]=3;
     actual_number_water++;
@@ -209,7 +209,7 @@ int actual_number_scissors=0;
 int actual_number_left=0;
 
 int actual_number_water = 0;
-for (int i=0;newinfo->number_triangles;i++) {
+for (int i=0;i<newinfo->number_triangles;i++) {
   if (newinfo->types[i]==0) {
     actual_number_rock++;
     }
@@ -364,8 +364,7 @@ dat->number_indexes = indexes;
 
 dat->indexes = malloc(sizeof(GLshort)*dat->number_indexes);
 dat->vertexes = malloc(sizeof(GLfloat)*4*dat->number_vertexes);
-dat->colors = malloc(sizeof(GLshort)*4*dat->number_vertexes);
-
+dat->colors = malloc(sizeof(GLfloat)*4*(dat->number_indexes/3));
 dat->final_vertexes = malloc(sizeof(GLfloat)*4*dat->number_indexes);
 dat->final_colors = malloc(sizeof(GLfloat)*4*dat->number_indexes);
 
@@ -397,11 +396,18 @@ free(dat);
 
 
 
+static void utoh () {
+fprintf(stderr,"utoh\n");
+}
+
 // order of n
-static int expand_locate_vertex(float *vertex,int *pnumber_vectors, float *new_vertexes) {
+static int expand_locate_vertex(float *vertex,int *pnumber_vectors, float *new_vertexes,int max) {
 int number_vectors = *pnumber_vectors;
 int i;
 for (i=0;i<number_vectors;i++) {
+  if (i>=max) {
+    utoh();
+    }
   float *test= &new_vertexes[i*4];
   if (test[0]!=vertex[0]) continue;
   if (test[1]!=vertex[1]) continue;
@@ -409,11 +415,11 @@ for (i=0;i<number_vectors;i++) {
   if (test[3]!=vertex[3]) continue;
   return i;
   }
-new_vertexes[i*4]=vertex[0];
-new_vertexes[i*4+1]=vertex[1];
-new_vertexes[i*4+2]=vertex[2];
-new_vertexes[i*4+3]=vertex[3];
-*pnumber_vectors++;
+new_vertexes[number_vectors*4]=vertex[0];
+new_vertexes[number_vectors*4+1]=vertex[1];
+new_vertexes[number_vectors*4+2]=vertex[2];
+new_vertexes[number_vectors*4+3]=vertex[3];
+*(pnumber_vectors)= number_vectors+1;
 return number_vectors;
 }
 
@@ -429,7 +435,7 @@ out[3] = (a[3]+b[3]) * 0.5;
 
 static video_planet_data * expand_detail_video_data(video_planet_data *outdat,video_planet_data *dat) {
 int new_indexes = dat->number_indexes*4;
-int new_vertexes = dat->number_vertexes*2;
+int new_vertexes = dat->number_indexes*3;  // max max
 video_planet_data *out = outdat;
 if ((!out)||(out==dat)||(out->number_indexes != new_indexes)||(out->number_vertexes != new_vertexes)) {
   out = allocate_video_data(new_vertexes,new_indexes);
@@ -449,21 +455,21 @@ for (int i=0;i<dat->number_indexes;i+=3) {
   int old_prev_v = dat->indexes[k];
   int old_next_v = dat->indexes[j];
   
-  int new_current_v = expand_locate_vertex(&dat->vertexes[i*4],&total_new_vectors,&out->vertexes[0]);
-  int new_next_v    = expand_locate_vertex(&dat->vertexes[j*4],&total_new_vectors,&out->vertexes[0]);
-  int new_prev_v    = expand_locate_vertex(&dat->vertexes[k*4],&total_new_vectors,&out->vertexes[0]);
+  int new_current_v = expand_locate_vertex(&dat->vertexes[old_current_v*4],&total_new_vectors,&out->vertexes[0],out->number_vertexes);
+  int new_next_v    = expand_locate_vertex(&dat->vertexes[old_next_v*4],&total_new_vectors,&out->vertexes[0],out->number_vertexes);
+  int new_prev_v    = expand_locate_vertex(&dat->vertexes[old_prev_v*4],&total_new_vectors,&out->vertexes[0],out->number_vertexes);
   
   float m1[4];
-  find_midpoint(m1,&dat->vertexes[i*4],&dat->vertexes[j*4]);
-  int new_m1 = expand_locate_vertex(m1,&total_new_vectors,&out->vertexes[0]);
+  find_midpoint(m1,&dat->vertexes[old_current_v*4],&dat->vertexes[old_next_v*4]);
+  int new_m1 = expand_locate_vertex(m1,&total_new_vectors,&out->vertexes[0],out->number_vertexes);
   
   float m2[4];
-  find_midpoint(m2,&dat->vertexes[j*4],&dat->vertexes[k*4]);
-  int new_m2 = expand_locate_vertex(m2,&total_new_vectors,&out->vertexes[0]);
+  find_midpoint(m2,&dat->vertexes[old_next_v*4],&dat->vertexes[old_prev_v*4]);
+  int new_m2 = expand_locate_vertex(m2,&total_new_vectors,&out->vertexes[0],out->number_vertexes);
   
   float m3[4];
-  find_midpoint(m3,&dat->vertexes[k*4],&dat->vertexes[i*4]);
-  int new_m3 = expand_locate_vertex(m3,&total_new_vectors,&out->vertexes[0]);
+  find_midpoint(m3,&dat->vertexes[old_prev_v*4],&dat->vertexes[old_current_v*4]);
+  int new_m3 = expand_locate_vertex(m3,&total_new_vectors,&out->vertexes[0],out->number_vertexes);
 
   // middle triangle
   int c=total_new_indexes/3;
@@ -498,6 +504,8 @@ for (int i=0;i<dat->number_indexes;i+=3) {
   
   old_ci++;
   };		
+
+out->number_vertexes = total_new_vectors;
 			
 explode_colors(out,dat);	
 return out;
@@ -535,25 +543,33 @@ int new_vertexes = dat->number_vertexes;
 video_planet_data *out = allocate_video_data(new_vertexes,new_indexes);
 
 copy_video_color_info(&out->color_info,&dat->color_info);
-
-for (int i=0;i<dat->number_indexes;i++) {
+int i;
+for (i=0;i<new_indexes;i++) {
   out->indexes[i] = dat->indexes[i];
   }
 
-for (int i=0;i<dat->number_vertexes*4;i++) {
+fprintf(stderr,"A %d\n",i);
+for (i=0;i<new_vertexes*4;i++) {
   out->vertexes[i] = dat->vertexes[i];
   }
+fprintf(stderr,"B %d\n",i);
 
-for (int i=0;i<dat->number_indexes*4;i++) {
+for (i=0;i<new_indexes/3*4;i++) {
   out->colors[i] = dat->colors[i];
   }
+fprintf(stderr,"C %d\n",i);
 
-for (int i=0;i<dat->number_indexes*4;i++) {
+for (i=0;i<new_indexes*4;i++) {
   out->final_vertexes[i] = dat->final_vertexes[i];
   }
-for (int i=0;i<dat->number_indexes*4;i++) {
+fprintf(stderr,"D %d\n",i);
+
+for (i=0;i<new_indexes*4;i++) {
   out->final_colors[i] = dat->final_colors[i];
   }
+fprintf(stderr,"E %d\n",i);
+  
+  
 
 out->expansion1 = dat->expansion1;
 out->expansion2 = dat->expansion2;
@@ -601,17 +617,18 @@ generate_colors(planetg->base,actual_rps,rps_view,color_saturation,other_color);
 transfer_vertexes_to_indexes(planetg->base);
 
 video_planet_data *intermediate = expand_detail_video_data(NULL,planetg->base);
+video_planet_data *intermediate2 = expand_detail_video_data(NULL,intermediate);
+video_planet_data *intermediate3 = expand_detail_video_data(NULL,intermediate2);
 
-
-planetg->expanded = expand_detail_video_data(NULL,intermediate);
+planetg->expanded = expand_detail_video_data(NULL,intermediate3);
 
 transfer_vertexes_to_indexes(planetg->expanded);
 
 free_video_data(intermediate);
-
+free_video_data(intermediate2);
+free_video_data(intermediate3);
 
 planetg->final = copy_video_data(planetg->expanded);
-
 
 
 glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat)*4*planetg->final->number_indexes, planetg->final->final_vertexes, GL_DYNAMIC_DRAW);
@@ -626,6 +643,9 @@ checkGlError("e");
 
 
 
+static void video_planet_step0_tetrahedron(hate_game *game,int planet_id) {
+
+}
 
 
 void video_planet_draw0_tetrahedron(hate_game *game,hate_screen *screen,int planet_id) {
@@ -693,14 +713,14 @@ generate_colors(planetg->base,actual_rps,rps_view,color_saturation,other_color);
 transfer_vertexes_to_indexes(planetg->base);
 
 video_planet_data *intermediate = expand_detail_video_data(NULL,planetg->base);
-
-
-planetg->expanded = expand_detail_video_data(NULL,intermediate);
-
+video_planet_data *intermediate2 = expand_detail_video_data(NULL,intermediate);
+video_planet_data *intermediate3 = expand_detail_video_data(NULL,intermediate2);
+planetg->expanded = expand_detail_video_data(NULL,intermediate3);
 transfer_vertexes_to_indexes(planetg->expanded);
 
 free_video_data(intermediate);
-
+free_video_data(intermediate2);
+free_video_data(intermediate3);
 
 planetg->final = copy_video_data(planetg->expanded);
 
@@ -719,7 +739,9 @@ checkGlError("e");
 
 
 
+static void video_planet_step1_cube(hate_game *game,int planet_id) {
 
+}
 
 
 static void video_planet_draw1_cube(hate_game *game,hate_screen *screen,int planet_id) {
@@ -733,11 +755,143 @@ video_planet_data *dat = planetg->final;
         glUniform4f(onec->colorHandle, 0.0f,0.8f,0.0f,1.0f);
     glVertexAttribPointer(onec->mPositionHandle, 4, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
     glEnableVertexAttribArray(onec->mPositionHandle);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat)*4*dat->number_indexes, dat->final_vertexes, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat)*4*dat->number_indexes, dat->final_vertexes, GL_DYNAMIC_DRAW);
     glDrawArrays(GL_LINE_STRIP, 0, dat->number_indexes);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+video_planet the_video_planet_diamond;
+
+
+
+
+
+void video_planet_init_diamond(hate_rps actual_rps,int *rps_view,float color_saturation, float *other_color) {
+
+video_planet *planetg = &the_video_planet_diamond;
+
+
+memset((void *)planetg,0,sizeof(video_planet));
+
+planetg->base = allocate_video_data(DIAMOND_VERTEXES,DIAMOND_INDEXES);
+
+
+
+glGenBuffers(1,&planetg->gl_vertex_buf);
+checkGlError("getvertex");
+glBindBuffer(GL_ARRAY_BUFFER,planetg->gl_vertex_buf);
+
+
+for (int i=0;i<planetg->base->number_indexes;i++) {
+  planetg->base->indexes[i] = octahedronIndices[i];
+  }
+for (int i=0;i<planetg->base->number_vertexes;i++) {
+  planetg->base->vertexes[i*4] = octahedronVerts[i][0];
+  planetg->base->vertexes[i*4+1] = octahedronVerts[i][1];
+  planetg->base->vertexes[i*4+2] = octahedronVerts[i][2];
+  planetg->base->vertexes[i*4+3] = 1.f;
+  }
+    
+
+generate_colors(planetg->base,actual_rps,rps_view,color_saturation,other_color);
+
+transfer_vertexes_to_indexes(planetg->base);
+
+video_planet_data *intermediate = expand_detail_video_data(NULL,planetg->base);
+video_planet_data *intermediate2 = expand_detail_video_data(NULL,intermediate);
+video_planet_data *intermediate3 = expand_detail_video_data(NULL,intermediate2);
+planetg->expanded = expand_detail_video_data(NULL,intermediate3);
+transfer_vertexes_to_indexes(planetg->expanded);
+
+free_video_data(intermediate);
+free_video_data(intermediate2);
+free_video_data(intermediate3);
+
+planetg->final = copy_video_data(planetg->expanded);
+
+
+
+glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat)*4*planetg->final->number_indexes, planetg->final->final_vertexes, GL_DYNAMIC_DRAW);
+checkGlError("c");
+glVertexAttribPointer(onec->mPositionHandle, 4, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
+glEnableVertexAttribArray(onec->mPositionHandle);
+checkGlError("d"); 
+glBindBuffer(GL_ARRAY_BUFFER, 0);
+checkGlError("e");
+
+}
+
+
+
+
+static void video_planet_step2_diamond(hate_game *game,int planet_id) {
+
+}
+
+
+static void video_planet_draw2_diamond(hate_game *game,hate_screen *screen,int planet_id) {
+int show_planet = screen->planet_choices[planet_id];
+video_planet *planetg = &the_video_planet_diamond;
+video_planet_data *dat = planetg->final;
+// assuming using onecolor porgaam
+
+
+        glBindBuffer(GL_ARRAY_BUFFER, planetg->gl_vertex_buf);
+        glUniform4f(onec->colorHandle, 0.0f,0.0f,1.0f,1.0f);
+    glVertexAttribPointer(onec->mPositionHandle, 4, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
+    glEnableVertexAttribArray(onec->mPositionHandle);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat)*4*dat->number_indexes, dat->final_vertexes, GL_DYNAMIC_DRAW);
+    glDrawArrays(GL_LINE_STRIP, 0, dat->number_indexes);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 void video_planet_init() {
 hate_rps actual_rps;
@@ -747,9 +901,9 @@ actual_rps.rps[2]=1.f;
 actual_rps.rps[3]=1.f/20.f;
 int rps_view[4];
 rps_view[0]=0;
-rps_view[1]=0;
-rps_view[2]=0;
-rps_view[3]=0;
+rps_view[1]=1;
+rps_view[2]=2;
+rps_view[3]=3;
 
 float color_saturation=0.f;
 
@@ -761,15 +915,23 @@ other_color[3]=1.f;
 
 video_planet_init_tetrahedron(actual_rps,rps_view,color_saturation, other_color);
 video_planet_init_cube(actual_rps,rps_view,color_saturation, other_color);
+video_planet_init_diamond(actual_rps,rps_view,color_saturation, other_color);
 }
 
+
+
+
 void video_planet_draw(hate_game *game,hate_screen *screen,int planet_id) {
+
 int show_planet = screen->planet_choices[planet_id];
 if (show_planet==0) {
   video_planet_draw0_tetrahedron(game,screen,planet_id);
   }
-else {
+if (show_planet==1) {
   video_planet_draw1_cube(game,screen,planet_id);
+  }
+else {
+  video_planet_draw2_diamond(game,screen,planet_id);
   }
 }
 
@@ -778,11 +940,10 @@ else {
 
 
 
-void video_planet_step(hate_game *game,hate_screen *screen,int planet_id) {
-int show_planet = screen->planet_choices[planet_id];
+void video_planet_step(hate_game *game) {
+  video_planet_step0_tetrahedron(game,0);
+  video_planet_step1_cube(game,1);
 }
-
-
 
 
 

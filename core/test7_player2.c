@@ -17,7 +17,6 @@
 #include <stdlib.h>
 
 
-
 #define GLFW_INCLUDE_ES2
 #include <GLFW/glfw3.h>
 
@@ -199,7 +198,9 @@ init_onecolor_specs(onec);
                       onec->colorHandle,onec->gvPositionHandle,onec->mPositionHandle); // needs to be set up once, with a single color program
       //once amonst all the drivers
     
-           
+    
+    // now that one color (ans supposedly multi color ) is set, we can init the video_planets
+    
 
     return 1;
 }
@@ -757,6 +758,8 @@ else {
 	checkGlError("j");
 
 
+    player2_init_graphics(&the_hate_game);
+
     network2_complete *c2 = &network2_abc;
     network2_init(c2,participant_number,"255.255.255.255",&(argv[1]),
        NULL,&(received_do_in1),&(sent_do_out1),NULL,
@@ -850,6 +853,12 @@ while (!glfwWindowShouldClose(window)) {
 // silentradiance ^^^^^
 
 	step();
+
+	
+		
+	checkGlError("v3clear");
+        glUseProgram(onec->one_color_program);
+			
         glClear(GL_COLOR_BUFFER_BIT);
 	
 	checkGlError("clear");

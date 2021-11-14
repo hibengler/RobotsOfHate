@@ -11,6 +11,8 @@
 #define TETRAHEDRON_VERTEXES 4
 #define CUBE_INDEXES 36
 #define CUBE_VERTEXES 8
+#define DIAMOND_INDEXES 24
+#define DIAMOND_VERTEXES 6
 
 typedef struct video_planet_color_info {
   hate_rps actual_rps;
@@ -58,7 +60,7 @@ void *expansion2;
 void video_planet_init();
 
 extern void video_planet_draw(hate_game *game,hate_screen *screen,int planet_id);
-extern void video_planet_step(hate_game *game,hate_screen *screen,int planet_id);
+extern void video_planet_step(hate_game *game);
 
 #endif
 

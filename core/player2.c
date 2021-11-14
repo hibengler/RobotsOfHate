@@ -290,9 +290,22 @@ for (int i=0;i<HATE_NUMBER_PLAYERS;i++) {
     map_frame_to_screen(frame,&game->screens.screens[i]);
     }
   }
+
+
 }
  
 static float angle=0.f;
+
+
+
+
+
+void player2_init_graphics(hate_game *game) {
+video_planet_init();
+}
+
+
+
 void player2_game_step(hate_game *game) {
 #ifdef junnnk
 for (int i=0;i<HATE_NUMBER_PLANETS;i++) {
@@ -313,7 +326,8 @@ for (int i=0;i<HATE_NUMBER_PLANETS;i++) {
 angle += 1./16500.;
 
 
-video_planet_init();
+video_planet_step(game);
+
 }
 
 
