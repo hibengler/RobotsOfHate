@@ -23,9 +23,6 @@ int to_player=0;
 char stdin_buffer[50000];
 
 
-void test3() {
-fprintf(stderr,"tet3\n");
-}
 
 
 int broadcast=0;
@@ -53,7 +50,6 @@ if (cv->poll_state[i]==5) {
       s[0]=ch;
       s[1]='\0';
       strcat(pending_send[to_player],s);
-      test3();
 //      fprintf(stderr,"___pending is %s\n",pending_send[to_player]);
       } 
     }
@@ -64,14 +60,13 @@ cv->call_rounds[i]=0;
 }
 
 void stdin_in3(struct network2_complete *c,int i, int n) {
-fprintf(stderr, "stdin_in3\n");
 }
 
 
 
 void do_in1(struct network2_complete *c,int i, int n) {
 volatile struct network2_complete *cv = (struct network2_complete *)c;
-fprintf(stderr,"do_in1 state is %d\b",c->poll_state[i]);
+//fprintf(stderr,"do_in1 state is %d\b",c->poll_state[i]);
 int communicator = c->communicator[i];
 if (c->poll_state[i]>=6) {
   fprintf(stderr,"xxx");
@@ -102,7 +97,7 @@ cv->call_rounds[i]=0;
 
 
 void do_out1(struct network2_complete *c,int i, int n) { 
-fprintf(stderr,"			out1\n\n");
+//fprintf(stderr,"			out1\n\n");
 volatile struct network2_complete *cv = (struct network2_complete *)c;
 
 if (cv->poll_state[i]>=6) {
@@ -115,7 +110,7 @@ int communicator = cv->communicator[i];
   if (strlen(sent_buffers[communicator])>60) {
     strcpy(sent_buffers[communicator], sent_buffers[communicator] +strlen(sent_buffers[communicator])-60);
     }
-  fprintf(stderr,"w");  
+//  fprintf(stderr,"w");  
   }
 cv->buflen[i]=0;
 cv->buffers[i][c->buflen[i]]='\0';
@@ -269,7 +264,7 @@ while (running) {
 	   }
 	 }
        else {
-  	   fprintf(stderr,"pending send waiting for packet to be sent, len %d\n", c->buflen[6+to_player]);
+//  	   fprintf(stderr,"pending send waiting for packet to be sent, len %d\n", c->buflen[6+to_player]);
 	   }
        
        } // if we can send

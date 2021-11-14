@@ -32,6 +32,7 @@ typedef struct onecolor_specs {
 
 extern void init_onecolor_specs (onecolor_specs *onec);
 
+extern onecolor_specs *onec;
 
 #endif
 

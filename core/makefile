@@ -4,7 +4,7 @@ LDFLAGS =  -lpthread
 
 
 #system: test_superpos superpos.a 
-system: test_superpos test2_draw_superpos test3_draw_robots test4_with_sound test5_player test6_playern2
+system: test_superpos test2_draw_superpos test3_draw_robots test4_with_sound test5_player test6_playern2 test7_player2
 
 
 test_superpos: test_superpos.o superpos.o
@@ -69,6 +69,24 @@ test4_with_sound:  superpos.o hibfonts.a larry_harvey_has_a_possee.o player.o \
 test6_playern2: network2.o test6_playern2.o network1.o 
 	gcc -p $(LDFLAGS)  -g -o test6_playern2 test6_playern2.o network1.o  network2.o  -lpthread
 	
+
+simple.a: helper.o simple_curl_web_stream.o simple_decrypt.o simple_processor.o simple_packet_summary.o simple_sound_alsa.o simple_seven_eight_decode.o
+	ar -rcs simple.a helper.o simple_curl_web_stream.o simple_decrypt.o simple_processor.o simple_packet_summary.o simple_sound_alsa.o simple_seven_eight_decode.o 	
+
+test7_player2: simple.a video_planets.o \
+        larry_harvey_has_a_possee.o player2.o \
+	  onecolor_specs.o  \
+          test7_player2.o network2.o network1.o hibfonts.a test7_player2.o network1.o
+	 gcc $(LDFLAGS)  -g \
+	  $(CFLAGS) -Wl,-rpath -Wl,LIBDIR -L/usr/local/lib \
+	    /usr/lib/x86_64-linux-gnu/libcurl.so -lasound -lopus -lraylib -lGL -lpthread -ldl -lrt -lX11 -lm -DPLATFORM_DESKTOP -pthread \
+	   -o test7_player2 test7_player2.o simple.a video_planets.o \
+	 	onecolor_specs.o network1.o network2.o  \
+	     larry_harvey_has_a_possee.o player2.o hibfonts.a   -lm  -lGLESv2 -lglfw \
+	       /usr/lib/x86_64-linux-gnu/libcurl.so -lasound -lopus  -lGL -lpthread \
+	       -ldl -lrt -lX11 -lm -DPLATFORM_DESKTOP -pthread
+		
+	
 test5_player: test5_player.o network1.o 
 	gcc -p $(LDFLAGS)  -g -o test5_player test5_player.o network1.o   -lpthread
 
@@ -109,3 +127,14 @@ network1.o: network1.c network1.h
 
 network2.o: network2.c network2.h network1.h
 	gcc -c  $(CFLAGS)  -Wl,-rpath -Wl,LIBDIR  network2.c
+
+player2.o: player2.c
+	gcc -c  $(CFLAGS)  -Wl,-rpath -Wl,LIBDIR  player2.c
+
+
+test7_player2.o: test7_player2.c
+	gcc -c  $(CFLAGS)  -Wl,-rpath -Wl,LIBDIR  test7_player2.c
+
+video_planets.o: video_planets.c video_planets.h
+	gcc -c  $(CFLAGS)  -Wl,-rpath -Wl,LIBDIR  video_planets.c
+

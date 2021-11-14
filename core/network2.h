@@ -5,7 +5,6 @@
 #define NETWORK2_H 1
 
 #include "network1.h"
-#include "player.h"
     
 struct network2_complete;	    
   
