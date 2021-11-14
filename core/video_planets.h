@@ -40,6 +40,8 @@ void *expansion2;
 
 typedef struct video_planet {
 int gl_vertex_buf;
+GLfloat rotation[3];
+GLfloat rotation_delta[3];
 video_planet_data *base;
 video_planet_data *expanded;
 video_planet_data *final;

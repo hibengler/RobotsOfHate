@@ -90,8 +90,8 @@ if (my_player_id ==5) { //supervisor and tie breaker
       } 
     else {
       for (int j=0;j<5;j++) {
-        screen->robot_choices[j]= game->screens.screens->robot_choices[j];  
-        screen->planet_choices[j]= game->screens.screens->planet_choices[j];  
+        screen->robot_choices[j]= game->screens.screens[0].robot_choices[j];  
+        screen->planet_choices[j]= game->screens.screens[0].planet_choices[j];  
 	}
     screen->rps_choices[0] = 0;
     screen->rps_choices[1] = 1;
@@ -330,18 +330,18 @@ video_planet_step(game);
 
 }
 
-
-
-
+		  
 void player2_game_draw(hate_game *game) {
 for (int s=0;s<HATE_NUMBER_PLAYERS;s++) {
   if (game->screens.enabled[s]) {
     hate_screen *screen = &(game->screens.screens[s]);
     onec->viewMatrix = screen->screenViewMatrix;
     
-//    multMatrix(&onec->MVPMatrix,&onec->viewMatrix,&onec->projectionMatrix);
+    
+    multMatrix(&onec->MVPMatrix,&onec->viewMatrix,&onec->projectionMatrix);
+    
     glUniformMatrix4fv(onec->mMVPMatrixHandle, 1, GL_FALSE, (GLfloat *)(&onec->MVPMatrix));
-    glUniformMatrix4fv(onec->mMVPMatrixHandle, 1, GL_FALSE, (GLfloat *)(&onec->viewMatrix));
+//    glUniformMatrix4fv(onec->mMVPMatrixHandle, 1, GL_FALSE, (GLfloat *)(&onec->viewMatrix));
     checkGlError("setmatrix");
     
   for (int i=0;i<HATE_NUMBER_PLANETS;i++) { // for each  planet

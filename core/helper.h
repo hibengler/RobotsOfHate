@@ -48,4 +48,8 @@ void translateMatrix2(glMatrix *result, GLfloat x,GLfloat y,GLfloat z);
 void scaleMatrix(glMatrix *result, GLfloat sx, GLfloat sy, GLfloat sz);
 void set_matrix_translate(GLfloat centerx,GLfloat centery);
 
+void rotationMatrix(glMatrix *result, GLfloat angle, GLfloat x, GLfloat y, GLfloat z);
+
+void frustumMatrix(glMatrix *result, float left, float right, float bottom, float top, float nearZ, float farZ);
+
 #endif

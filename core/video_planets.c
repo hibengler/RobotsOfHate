@@ -536,6 +536,20 @@ return out;
 
 }
 
+static void rotation_step(hate_game *game,int planet_id,video_planet *planetg) {
+planetg->rotation[0] += planetg->rotation_delta[0];
+planetg->rotation[1] += planetg->rotation_delta[1];
+planetg->rotation[2] += planetg->rotation_delta[2];
+
+if (planetg->rotation[0]<0.f) {planetg->rotation[0] += 6.283185307f;}
+else if (planetg->rotation[0]>6.283185307f) {planetg->rotation[0] -= 6.283185307f;}
+if (planetg->rotation[1]<0.f) {planetg->rotation[1] += 6.283185307f;}
+else if (planetg->rotation[1]>6.283185307f) {planetg->rotation[1] -= 6.283185307f;}
+if (planetg->rotation[2]<0.f) {planetg->rotation[2] += 6.283185307f;}
+else if (planetg->rotation[2]>6.283185307f) {planetg->rotation[2] -= 6.283185307f;}
+
+}
+
 
 static video_planet_data * copy_video_data(video_planet_data *dat) {
 int new_indexes = dat->number_indexes;
@@ -579,6 +593,33 @@ return out;
 }
 
 
+static void init_rotation(video_planet *planetg) {
+planetg->rotation[0] = (float)((unsigned int) (rand()&65535) )*6.28f/65535.f;
+planetg->rotation[1] = (float)((unsigned int)(rand()&65535)  )*6.28f/65535.f;
+planetg->rotation[2] = (float)((unsigned int)(rand()&65535)  )*6.28f/65535.f;
+
+int first_pick = (rand() % 3);
+int second_pick = (rand() &1) + 1;
+int third_pick = (first_pick + second_pick + 1) %3;
+second_pick = (first_pick + second_pick) %3;
+
+planetg->rotation_delta[first_pick] = (float)( (unsigned int)(rand()&65535+8000))*0.0314f/65535.f + 0.011;
+planetg->rotation_delta[second_pick] = planetg->rotation_delta[first_pick] * (0.15 +  (float)((unsigned int)(rand()&65535)))*0.50/65536.f;
+planetg->rotation_delta[third_pick] = planetg->rotation_delta[second_pick] * (0.15 +  (float)((unsigned int)(rand()&65535)))*0.50/65536.f;
+
+if (rand()&1) {
+  planetg->rotation_delta[first_pick] = -planetg->rotation_delta[first_pick];
+  }
+
+  
+if (rand()&1) {
+  planetg->rotation_delta[second_pick] = -planetg->rotation_delta[second_pick];
+  }
+if (rand()&1) {
+  planetg->rotation_delta[third_pick] = -planetg->rotation_delta[third_pick];
+  }
+
+}
 
 
 
@@ -630,6 +671,9 @@ free_video_data(intermediate3);
 
 planetg->final = copy_video_data(planetg->expanded);
 
+init_rotation(planetg);
+
+      
 
 glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat)*4*planetg->final->number_indexes, planetg->final->final_vertexes, GL_DYNAMIC_DRAW);
 checkGlError("c");
@@ -643,8 +687,37 @@ checkGlError("e");
 
 
 
-static void video_planet_step0_tetrahedron(hate_game *game,int planet_id) {
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+static void video_planet_step0_tetrahedron(hate_game *game,int planet_id) {
+	    
+		  
+			      
+video_planet *planetg = &the_video_planet_tetrahedron;
+rotation_step(game,planet_id,planetg);
 }
 
 
@@ -724,7 +797,7 @@ free_video_data(intermediate3);
 
 planetg->final = copy_video_data(planetg->expanded);
 
-
+init_rotation(planetg);
 
 glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat)*4*planetg->final->number_indexes, planetg->final->final_vertexes, GL_DYNAMIC_DRAW);
 checkGlError("c");
@@ -740,6 +813,8 @@ checkGlError("e");
 
 
 static void video_planet_step1_cube(hate_game *game,int planet_id) {
+video_planet *planetg = &the_video_planet_cube;
+rotation_step(game,planet_id,planetg);
 
 }
 
@@ -833,7 +908,7 @@ free_video_data(intermediate3);
 
 planetg->final = copy_video_data(planetg->expanded);
 
-
+init_rotation(planetg);
 
 glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat)*4*planetg->final->number_indexes, planetg->final->final_vertexes, GL_DYNAMIC_DRAW);
 checkGlError("c");
@@ -849,6 +924,8 @@ checkGlError("e");
 
 
 static void video_planet_step2_diamond(hate_game *game,int planet_id) {
+video_planet *planetg = &the_video_planet_diamond;
+rotation_step(game,planet_id,planetg);
 
 }
 
@@ -888,7 +965,7 @@ video_planet_data *dat = planetg->final;
 
 
 
-
+static video_planet *all_video_planets[5];
 
 
 
@@ -916,18 +993,70 @@ other_color[3]=1.f;
 video_planet_init_tetrahedron(actual_rps,rps_view,color_saturation, other_color);
 video_planet_init_cube(actual_rps,rps_view,color_saturation, other_color);
 video_planet_init_diamond(actual_rps,rps_view,color_saturation, other_color);
+
+
+all_video_planets[0] = &the_video_planet_tetrahedron; 
+all_video_planets[1] = &the_video_planet_cube; 
+all_video_planets[2] = &the_video_planet_diamond; 
+all_video_planets[3] = NULL;
+all_video_planets[4] = NULL;
+
 }
 
 
 
 
-void video_planet_draw(hate_game *game,hate_screen *screen,int planet_id) {
 
+																			
+
+
+/* screen number*5+real_player_number */
+static int placement[] = {0,1,2,3,4,
+                 4,0,1,2,3,
+                 3,4,0,1,2,
+                 2,3,4,0,1, 
+                 1,2,3,4,0};
+static float placement_scale = 0.4f;
+static float translate_size = 1.33333333f;
+static float pos_translate[] = {0.f,0.f,0.f,
+                     1.f,1.f,0.f,
+                     1.f,-1.f,0.f,
+                     -1.f,-1.f,0.f,
+                     -1.f,1.f,0.f};
+
+
+
+void video_planet_draw(hate_game *game,hate_screen *screen,int planet_id) {
+int screen_number = screen->player_id;
+
+//fprintf(stderr,"screen %d	planet %d   plx %d	show %d\n",screen_number,planet_id, placement[screen_number*5+planet_id],screen->planet_choices[planet_id]);
+glMatrix r;
+loadIdentity(&r);
 int show_planet = screen->planet_choices[planet_id];
+
+
+int  plx = placement[screen_number*5+planet_id];
+
+translateMatrix(&r,translate_size*pos_translate[plx*3],
+  translate_size*pos_translate[plx*3+1],
+  translate_size*pos_translate[plx*3+2]);
+scaleMatrix(&r,placement_scale,placement_scale,placement_scale);
+video_planet *pl = all_video_planets[show_planet];
+if (pl) {
+//  fprintf(stderr,"rotayion %f,%f,%f\n",pl->rotation[0]*360./6.28318530718f,pl->rotation[1]*360./6.28318530718f,pl->rotation[2]*360./6.28318530718f);
+  rotationMatrix(&r,pl->rotation[0]*360./6.28318530718f,1.f,0.f,0.f);
+  rotationMatrix(&r,pl->rotation[1]*360./6.28318530718f,0.f,1.f,0.f);
+  rotationMatrix(&r,pl->rotation[2]*360./6.28318530718f,0.f,0.f,1.f);
+  
+  }
+glMatrix f;
+multMatrix(&f,&r,(&onec->MVPMatrix));
+glUniformMatrix4fv(onec->mMVPMatrixHandle, 1, GL_FALSE, (GLfloat *)(&f));
+
 if (show_planet==0) {
   video_planet_draw0_tetrahedron(game,screen,planet_id);
   }
-if (show_planet==1) {
+else if (show_planet==1) {
   video_planet_draw1_cube(game,screen,planet_id);
   }
 else {
@@ -943,6 +1072,7 @@ else {
 void video_planet_step(hate_game *game) {
   video_planet_step0_tetrahedron(game,0);
   video_planet_step1_cube(game,1);
+  video_planet_step2_diamond(game,2);
 }
 
 

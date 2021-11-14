@@ -11,6 +11,7 @@
 #include "superpos.h"
 #include "helper.h"
 #include "onecolor_specs.h"
+#include "multicolor_specs.h"
 #include "player2.h"
 #include "network2.h"
 #include <stdio.h>
@@ -60,10 +61,72 @@ static char * gFragmentShaderOneColor =
         "  gl_FragColor = v_Color;\n"
         "}\n";
 
+// WORLD_INTERNATIONAL off
+#ifdef _WIN32
+const char gStandard3dVertexVaryingColorShader[] =
+        "precision mediump float;"
+        "uniform mat4 u_mvpMat;"
+        "attribute vec4 a_position;"   
+        "attribute vec4 a_color;"
+        "varying vec4 v_color;"
+        "void main()"
+        "{"                                 
+        "gl_Position = u_mvpMat * a_position;"
+        "v_color = a_color;"
+        "}";
+const char gStandard3dFragmentVaryingColorShader[] =
+        "precision mediump float;"
+        "varying vec4 v_color;"
+        "void main()"
+        "{"
+        "    gl_FragColor = v_color;"  
+        "}";
+#else
+const char gStandard3dVertexVaryingColorShader[] =
+        "precision mediump float;"
+        "uniform mat4 u_mvpMat;"
+        "attribute vec4 a_position;"
+        "attribute vec4 a_color;"
+        "varying lowp vec4 v_color;"
+        "void main()"
+        "{"
+        "gl_Position = u_mvpMat * a_position;"
+        "v_color = a_color;"
+        "}";
+const char gStandard3dFragmentVaryingColorShader[] =
+        "varying lowp vec4 v_color;"
+        "void main()"
+        "{"
+        "    gl_FragColor = v_color;"
+        "}";
+#endif      
+// WORLD_INTERNATIONAL on
+
+
+/* borrowed from http://stackoverflow.com/questions/12943164/replacement-for-gluperspective-with-glfrustrum */
+static void perspectiveGL( glMatrix *projection,GLfloat fovY, GLfloat aspect, GLfloat zNear, GLfloat zFar )
+{
+    const GLfloat pi = 3.1415926535897932384626433832795;
+    GLfloat fW, fH;
+
+    //fH = tan( (fovY / 2) / 180 * pi ) * zNear;
+    fH = tan( fovY / 360.f * pi ) * zNear;
+    fW = fH * aspect;
+
+    //glFrustum( -fW, fW, -fH, fH, zNear, zFar );
+    frustumMatrix(projection,-fW, fW, -fH, fH, zNear, zFar );
+}
+
 
 onecolor_specs onecs;
 onecolor_specs *onec=&onecs;
+multicolor_specs multics;
+multicolor_specs *multic=&multics;
 hate_game  the_hate_game;
+
+
+
+
 
 
 
@@ -76,7 +139,14 @@ multMatrix(&onec->origin_matrix,&tempMVMatrix,&onec->projectionMatrix);
 }   
 
 
-static void set_matrix() {
+static void activate_matrix_handle(int matrix_handle) {
+    glUniformMatrix4fv(matrix_handle,1,0,(GLfloat *)&onec->MVPMatrix);
+    // Apply the projection and view transformation
+   checkGlError("setmatrix");
+
+}
+
+static void set_matrix_handle(int matrix_handle) {
       
     glMatrix *xmatrix;
     glMatrix stageMatrix;
@@ -89,21 +159,35 @@ static void set_matrix() {
       }
     multMatrix(&onec->MVMatrix,xmatrix,&onec->viewMatrix);
     multMatrix(&onec->MVPMatrix,&onec->MVMatrix,&onec->projectionMatrix);
+    activate_matrix_handle(matrix_handle);    
     
-    
-    // Apply the projection and view transformation
-    glUniformMatrix4fv(onec->
-   mMVPMatrixHandle, 1, GL_FALSE, (GLfloat *)(&onec->MVPMatrix));
-   checkGlError("setmatrix");
 }       
+
+
+void set_matrix_translate_handle(int matrix_handle,GLfloat centerx,GLfloat centery) {
+    loadIdentity(&onec->modelMatrix);
+    translateMatrix(&onec->modelMatrix,centerx,centery,0.f);
+set_matrix_handle(matrix_handle);
+}          
+
+void set_matrix_scale_translate_handle(int matrix_handle,GLfloat scale,GLfloat centerx,GLfloat centery) {
+    loadIdentity(&onec->modelMatrix);
+    scaleMatrix(&onec->modelMatrix,scale,scale,scale);
+    translateMatrix(&onec->modelMatrix,centerx,centery,0.f);
+set_matrix_handle(matrix_handle);
+}          
+         
+
+
+static void set_matrix() {
+set_matrix_handle(onec->mMVPMatrixHandle);
+}
     
     
 void set_matrix_translate(GLfloat centerx,GLfloat centery) {
-    loadIdentity(&onec->modelMatrix);
-    translateMatrix(&onec->modelMatrix,centerx,centery,0.f);
-set_matrix();
+set_matrix_translate_handle(onec->mMVPMatrixHandle,centerx,centery);
 }          
-         
+
 
   
 extern GLint common_get_shader_program(const char *vertex_shader_source, const char *fragment_shader_source);
@@ -152,16 +236,23 @@ sprintf(buf,"%s:%d: %s",filename,lineno,op);
 return checkGlError(buf);
 }
 
-int setup_graphics_for_letters_and_robots(int participant_id) {
+int setup_graphics_for_letters_and_robots(int participant_id,int w,int h) {
 init_onecolor_specs(onec);
+init_multicolor_specs(multic,onec);
+
     loadIdentity(&onec->modelMatrix);
     loadIdentity(&onec->effectMatrix);
     loadIdentity(&onec->viewMatrix);
     loadIdentity(&onec->projectionMatrix);
         
-    set_origin_matrix();
+    set_origin_matrix(); // works for onec and multic
     fprintf(stderr,"calling player2_game_init\n");
     player2_game_init(&the_hate_game,participant_id); // that is out player id
+
+    loadIdentity(&onec->projectionMatrix);
+    perspectiveGL(&onec->projectionMatrix,45.f, ((GLfloat)w)/((GLfloat)h),  -4.f, 4.f);
+    
+    
     fprintf(stderr,"done player2_game_init\n");
           
     onec->one_color_program = common_get_shader_program(gVertexShaderOneColor,gFragmentShaderOneColor);
@@ -199,12 +290,38 @@ init_onecolor_specs(onec);
       //once amonst all the drivers
     
     
-    // now that one color (ans supposedly multi color ) is set, we can init the video_planets
+   // now for multicolor
+    multic->multi_color_program = common_get_shader_program(gStandard3dVertexVaryingColorShader,gStandard3dFragmentVaryingColorShader);
+    multic->mMVPMatrixHandle = glGetUniformLocation(multic->multi_color_program, "u_mvpMat");
+      if (checkGlError("glGetAttribLocation")) {
+        fprintf(stderr,"Could not create matrix handle.\n");
+        return 0;
+	 }
+    multic->gvPositionHandle = glGetAttribLocation(multic->multi_color_program, "a_position");
+
+      if (    checkGlError("glGetAttribLocation")) {
+        fprintf(stderr,"Could not create gv position handle.\n");
+        return 0;
+    }
+    // get handle to fragment shader's v_Color member
+    multic->gvColorHandle = glGetAttribLocation(multic->multi_color_program, "a_color");
+
+    if (checkGlError("glGetAttribLocation")) {
+        fprintf(stderr,"Could not locqtuib color attrub handle.\n");
+        return 0;
+    }
+    glUseProgram(multic->multi_color_program);
+    checkGlError("useprogram");
+    activate_matrix_handle(multic->gvPositionHandle);
+   
+    glUseProgram(onec->one_color_program);
+    checkGlError("useprogram");
     
 
     return 1;
 }
     
+
 
 
 
@@ -551,7 +668,28 @@ cv->call_rounds[i]=0;
 }
 
 
+
+
+
+
+
+// repeated in video_planets
+/* screen number*5+real_player_number */
+static int placement[] = {0,1,2,3,4,
+                 4,0,1,2,3,
+                 3,4,0,1,2,
+                 2,3,4,0,1,
+                 1,2,3,4,0};
+static float pos_translate[] = {0.f,0.f,0.f,
+                     1.f,1.f,0.f,
+                     1.f,-1.f,0.f,
+                     -1.f,-1.f,0.f,
+                     -1.f,1.f,0.f};
+
+
 void draw_multiscreen_grid_and_planets(GLuint vboframe,float *this_foreground) {
+hate_game *game = &the_hate_game;
+
         glUseProgram(onec->one_color_program);
 	checkGlError("useprogram");
         glUniform4f(onec->colorHandle, this_foreground[0],this_foreground[1],this_foreground[2],this_foreground[3]);
@@ -576,52 +714,43 @@ void draw_multiscreen_grid_and_planets(GLuint vboframe,float *this_foreground) {
         lc->needed_points->line_width=0.0428f;
         glBindBuffer(GL_ARRAY_BUFFER, 0);	
 	
-        letters_out(lc,0.05f,-0.025f,-0.025f,0.f,"0");
-        letters_out(lc,0.05f,0.166666666f-0.025f,0.166666666f-0.025f,0.f,"1");
-        letters_out(lc,0.05f,0.166666666f-0.025f,-0.166666666f-0.025f,0.f,"2");
-        letters_out(lc,0.05f,-0.166666666f-0.025f,-0.166666666f-0.025f,0.f,"3");
-        letters_out(lc,0.05f,-0.166666666f-0.025f,0.166666666f-0.025f,0.f,"4");
+ 
+	for (int screen_numberx=0;screen_numberx<5;screen_numberx++) {
+          hate_screen *screen = &game->screens.screens[screen_numberx];
+	  
+	  
+	    onec->viewMatrix = screen->screenViewMatrix;
 
-	float xx=0.66666;
-	float yy=0.66666;
-        letters_out(lc,0.05f,xx-0.025f,yy-0.025f,0.f,"1");
-        letters_out(lc,0.05f,xx+0.166666666f-0.025f,yy+0.166666666f-0.025f,0.f,"2");
-        letters_out(lc,0.05f,xx+0.166666666f-0.025f,yy+-0.166666666f-0.025f,0.f,"3");
-        letters_out(lc,0.05f,xx-0.166666666f-0.025f,yy+-0.166666666f-0.025f,0.f,"4");
-        letters_out(lc,0.05f,xx-0.166666666f-0.025f,yy+0.166666666f-0.025f,0.f,"0");
-			
-	 xx=0.66666;
-	 yy=-0.66666;
-        letters_out(lc,0.05f,xx-0.025f,yy-0.025f,0.f,"2");
-        letters_out(lc,0.05f,xx+0.166666666f-0.025f,yy+0.166666666f-0.025f,0.f,"3");
-        letters_out(lc,0.05f,xx+0.166666666f-0.025f,yy+-0.166666666f-0.025f,0.f,"4");
-        letters_out(lc,0.05f,xx-0.166666666f-0.025f,yy+-0.166666666f-0.025f,0.f,"0");
-        letters_out(lc,0.05f,xx-0.166666666f-0.025f,yy+0.166666666f-0.025f,0.f,"1");
-			
-	 xx=-0.66666;
-	 yy=-0.66666;
-        letters_out(lc,0.05f,xx-0.025f,yy-0.025f,0.f,"3");
-        letters_out(lc,0.05f,xx+0.166666666f-0.025f,yy+0.166666666f-0.025f,0.f,"4");
-        letters_out(lc,0.05f,xx+0.166666666f-0.025f,yy+-0.166666666f-0.025f,0.f,"0");
-        letters_out(lc,0.05f,xx-0.166666666f-0.025f,yy+-0.166666666f-0.025f,0.f,"1");
-        letters_out(lc,0.05f,xx-0.166666666f-0.025f,yy+0.166666666f-0.025f,0.f,"2");
+
+         multMatrix(&onec->MVPMatrix,&onec->viewMatrix,&onec->projectionMatrix);
+         glUniformMatrix4fv(onec->mMVPMatrixHandle, 1, GL_FALSE, (GLfloat *)(&onec->MVPMatrix));
+
+	  
+  	  for (int planet_id=0;planet_id<5;planet_id++) {
+ 	    int screen_number = screen->player_id;
+	    int  plx = placement[screen_number*5+planet_id];
 	
-	 xx=-0.66666;
-	 yy=0.66666;
-        letters_out(lc,0.05f,xx-0.025f,yy-0.025f,0.f,"4");
-        letters_out(lc,0.05f,xx+0.166666666f-0.025f,yy+0.166666666f-0.025f,0.f,"0");
-        letters_out(lc,0.05f,xx+0.166666666f-0.025f,yy+-0.166666666f-0.025f,0.f,"1");
-        letters_out(lc,0.05f,xx-0.166666666f-0.025f,yy+-0.166666666f-0.025f,0.f,"2");
-        letters_out(lc,0.05f,xx-0.166666666f-0.025f,yy+0.166666666f-0.025f,0.f,"3");
-			
+	    float d=1.3333333333f;
+	    float o=0.2f;
+	    float w=0.16f;
+  	    float zdiff = 1.0f;
+	    char xx[2];
+	    xx[0]='0' + planet_id;
+	    xx[1]='\0';
+            letters_out(lc,w,d*pos_translate[plx*3]-o,
+	                   d*pos_translate[plx*3+1]-o,zdiff,xx);
+            }
+	  }
+	
         glUseProgram(onec->one_color_program);
 	checkGlError("useprogram");
 }
 
 
 
-
 void draw_singlescreen_grid_and_planets(GLuint vboboxframe,float *this_foreground) {
+hate_game *game = &the_hate_game;
+hate_screen *screen = &game->screens.screens[0];
         glUseProgram(onec->one_color_program);
 	checkGlError("useprogram");
         glUniform4f(onec->colorHandle, this_foreground[0],this_foreground[1],this_foreground[2],this_foreground[3]);
@@ -647,16 +776,21 @@ void draw_singlescreen_grid_and_planets(GLuint vboboxframe,float *this_foregroun
         lc->needed_points->line_width=0.0428f*3.5f;
         glBindBuffer(GL_ARRAY_BUFFER, 0);	
 	
-	{
-	float d=0.66666f;
-	float o=0.1f;
-	float w=0.16f;
-        letters_out(lc,w,-o,-o,0.f,"0");
-        letters_out(lc,w,d-o,d-o,0.f,"1");
-        letters_out(lc,w,d-o,-d-o,0.f,"2");
-        letters_out(lc,w,-d-o,-d-o,0.f,"3");
-        letters_out(lc,w,-d-o,d-o,0.f,"4");
-        }
+	for (int planet_id=0;planet_id<5;planet_id++) {
+ 	  int screen_number = screen->player_id;
+	  int  plx = placement[screen_number*5+planet_id];
+	
+	  float d=0.6666666666666666f;
+	  float o=0.1f;
+	  float w=0.16f;
+	  float zdiff = 1.0f;
+	  char xx[2];
+	  xx[0]='0' + planet_id;
+	  xx[1]='\0';
+          letters_out(lc,w,d*pos_translate[plx*3]-o,
+	                   d*pos_translate[plx*3+1]-o,zdiff,xx);
+	  zdiff = -zdiff;
+          }
         glUseProgram(onec->one_color_program);
 	checkGlError("useprogram");
 return;
@@ -712,7 +846,7 @@ else {
 
     
 
-    setup_graphics_for_letters_and_robots(participant_number);	// this has a matrix to do 3d model, effect, etc
+    setup_graphics_for_letters_and_robots(participant_number, screen_width, screen_height);	// this has a matrix to do 3d model, effect, etc
 
     
 

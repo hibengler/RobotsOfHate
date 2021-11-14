@@ -48,6 +48,9 @@ helper.o: helper.c helper.h
 onecolor_specs,o: onecolor_specs.c onecolor_specs.h
 	gcc -o onecolor_specs -g onecolor_specs.c
 
+multicolor_specs,o: multicolor_specs.c multicolor_specs.h
+	gcc -o multicolor_specs -g multicolor_specs.c
+
 test4_with_sound:  superpos.o hibfonts.a larry_harvey_has_a_possee.o player.o \
 	  onecolor_specs.o test3_draw_robots.o helper.o \
 	   simple_curl_web_stream.o simple_decrypt.o simple_processor.o \
@@ -75,13 +78,13 @@ simple.a: helper.o simple_curl_web_stream.o simple_decrypt.o simple_processor.o 
 
 test7_player2: simple.a video_planets.o \
         larry_harvey_has_a_possee.o player2.o \
-	  onecolor_specs.o  \
+	  onecolor_specs.o  multicolor_specs.o \
           test7_player2.o network2.o network1.o hibfonts.a test7_player2.o network1.o
 	 gcc $(LDFLAGS)  -g \
 	  $(CFLAGS) -Wl,-rpath -Wl,LIBDIR -L/usr/local/lib \
 	    /usr/lib/x86_64-linux-gnu/libcurl.so -lasound -lopus -lraylib -lGL -lpthread -ldl -lrt -lX11 -lm -DPLATFORM_DESKTOP -pthread \
 	   -o test7_player2 test7_player2.o simple.a video_planets.o \
-	 	onecolor_specs.o network1.o network2.o  \
+	 	onecolor_specs.o network1.o network2.o multicolor_specs.o \
 	     larry_harvey_has_a_possee.o player2.o hibfonts.a   -lm  -lGLESv2 -lglfw \
 	       /usr/lib/x86_64-linux-gnu/libcurl.so -lasound -lopus  -lGL -lpthread \
 	       -ldl -lrt -lX11 -lm -DPLATFORM_DESKTOP -pthread
