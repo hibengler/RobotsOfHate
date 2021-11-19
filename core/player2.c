@@ -5,6 +5,7 @@
 
 #include "player2.h"
 #include "video_planets.h"
+#include "video_robots.h"
 #include "larry_harvey_has_a_possee.h"
 #include "onecolor_specs.h"
 #include <sys/time.h>
@@ -12,7 +13,7 @@
 static int pick_leagues(int *robot_choices) {
 for (int i=0;i<HATE_NUMBER_ROBOTS;) {
   unsigned int pick;
-  pick = (rand() /19);
+  pick = (rand() %19);
   pick = pick % (HATE_NUMBER_LEAGUES);
   int j;
   for (j=0;j<i;j++) {
@@ -31,28 +32,29 @@ for (int i=0;i<HATE_NUMBER_ROBOTS;) {
 }
 
 
-static int pick_rgb_choices(int *rgb_choices) {
-for (int i=0;i<3;) {
-  unsigned int pick;
-  pick = (rand() /19);
+static int pick_rps_choices(int *rgb_choices) {
+
+  int pick = (rand() %19);
   pick = pick % (3);
   int j;
-  for (j=0;j<i;j++) {
-    if (pick==rgb_choices[j]) {
-      break;
-      }
-    }
-  if (j==i) { /* not picked before */
-    rgb_choices[i++] = pick;
-    }
-  }
+  rgb_choices[0] = pick;
+  rgb_choices[1] =  ((pick+1) % 3);
+  rgb_choices[2] =  ((pick+2) % 3);
+
+// either rock < paper, paper < scissors, scissors < rock
+// or     paper < scissors, scissors < rock, rock < paper
+// or     scissors < rock, rock < paper, paper < scissors
+// has to be only one of 3 randomized chooices
+
 }
 
 
+
+// planet choices shows whic planet for each planet.
 static int pick_planet_choices(int *planet_choices) {
 for (int i=0;i<HATE_NUMBER_PLANETS;) {
   unsigned int pick;
-  pick = (rand() /19);
+  pick = (rand() %19);
   pick = pick % (HATE_NUMBER_PLANETS);
   int j;
   for (j=0;j<i;j++) {
@@ -67,6 +69,38 @@ for (int i=0;i<HATE_NUMBER_PLANETS;) {
 }
 
 
+static hate_rps randomize_planet_strength(hate_rps strength) {
+float size;
+size = strength.rps[0] + strength.rps[1] + strength.rps[2];
+int pos1 = (rand()&31)%3;
+int pos2 = pos1 + ( ((rand()&31)%2)+1)%3;
+int pos3= (pos1+1)%3;
+if (pos3==pos2) {pos3 = (pos2+1)%3;}
+// pos1,2,3 are all random
+float one_over_size = 1.;
+if (size<=0.f) {
+  size=0.f;
+  }
+else {
+  one_over_size = 1.f/size;
+  }
+
+float f1 =  (float)( (rand()&65535) ) * size / 65536.;
+float size2 = size - f1;
+if (size2<0.f) size2=0.f;
+
+float f2 =   (float)( (rand()&65535) ) * size2 / 65536.;
+if (f1<0.f) f1=0.f;
+float f3 = size-(f1+f2);
+if (f3<0.f) f3 = 0.f;
+strength.rps[pos1] = f1;
+strength.rps[pos2] = f2;
+strength.rps[pos3] = f3;
+if (strength.rps[3]<0.f) strength.rps[3]=0.f;
+if (strength.rps[3]>size) strength.rps[3]=size;
+return strength;
+}
+
 
 
 void game_init_screens(hate_game *game,int my_player_id,float dist) {
@@ -78,12 +112,12 @@ if (my_player_id ==5) { //supervisor and tie breaker
   hate_screens *screens = &(game->screens);
 
   /* init screens */
-  for (int i=0;i<HATE_NUMBER_PLAYERS;i++) {
+  for (int i=0;i<HATE_NUMBER_SCREENS;i++) {
     game->screens.enabled[i]=0;
     }
-  for (int i=0;i<HATE_NUMBER_PLAYERS;i++) {
+  for (int i=0;i<HATE_NUMBER_SCREENS;i++) {
     hate_screen *screen = &(screens->screens[i]);
-    screen->player_id=i;
+    screen->central_planet_id=i;
     if (i==0) {
       pick_leagues(&(screen->robot_choices[0]));
       pick_planet_choices(&(screen->planet_choices[0]));
@@ -93,9 +127,9 @@ if (my_player_id ==5) { //supervisor and tie breaker
         screen->robot_choices[j]= game->screens.screens[0].robot_choices[j];  
         screen->planet_choices[j]= game->screens.screens[0].planet_choices[j];  
 	}
-    screen->rps_choices[0] = 0;
-    screen->rps_choices[1] = 1;
-    screen->rps_choices[2] = 2;
+    screen->rps_choices[0] = 0; // keep it normalized
+    screen->rps_choices[1] = 1; // for the main screen
+    screen->rps_choices[2] = 2; // oh yeah
     }  
   
     if (i==0) {
@@ -137,13 +171,13 @@ if (my_player_id ==5) { //supervisor and tie breaker
   } // if we ar e super
 else {
   /* init screens */
-  for (int i=0;i<HATE_NUMBER_PLAYERS;i++) {
+  for (int i=0;i<HATE_NUMBER_SCREENS;i++) {
     game->screens.enabled[i]=0;
     }
   hate_screen *screen = &(game->screens.screens[0]);
-  screen->player_id=my_player_id;
+  screen->central_planet_id=my_player_id;
   pick_leagues(&(screen->robot_choices[0]));
-  pick_rgb_choices(&(screen->rps_choices[0]));
+  pick_rps_choices(&(screen->rps_choices[0]));
   pick_planet_choices(&(screen->planet_choices[0]));
 
   loadIdentity(&range);
@@ -163,6 +197,8 @@ a.rps[2] += b.rps[2];
 a.rps[3] += b.rps[3];
 return a;
 }
+
+
 
 static void compute_player_strength(hate_frame *frame) {
 for (int i=0;i<HATE_NUMBER_PLAYERS_PLUS_1;i++) { 
@@ -265,6 +301,8 @@ for (int i=0;i<HATE_NUMBER_PLANETS;i++) {
   thing->object_player_id = planet->player_id;
   thing->object_me_id = thing_id;
   thing->strength = (hate_rps){rps:{HATE_PLANET_INITIAL_R,HATE_PLANET_INITIAL_P,HATE_PLANET_INITIAL_S,HATE_PLANET_INITIAL_D}};
+  thing->strength = randomize_planet_strength(thing->strength);
+//  thing->strength = (hate_rps){rps:{HATE_PLANET_INITIAL_R,HATE_PLANET_INITIAL_P,HATE_PLANET_INITIAL_S,HATE_PLANET_INITIAL_D}};
   thing->action_id=0;
   thing_id++;
   }
@@ -285,7 +323,7 @@ frame->stats_are_useful=0;
   
 compute_player_strength(frame);
   
-for (int i=0;i<HATE_NUMBER_PLAYERS;i++) {
+for (int i=0;i<HATE_NUMBER_SCREENS;i++) {
   if (game->screens.enabled[i]) {
     map_frame_to_screen(frame,&game->screens.screens[i]);
     }
@@ -301,7 +339,8 @@ static float angle=0.f;
 
 
 void player2_init_graphics(hate_game *game) {
-video_planet_init();
+video_planet_init(game);
+video_robots_init(game);
 }
 
 
@@ -327,12 +366,13 @@ angle += 1./16500.;
 
 
 video_planet_step(game);
+video_robots_step(game);
 
 }
 
 		  
 void player2_game_draw(hate_game *game) {
-for (int s=0;s<HATE_NUMBER_PLAYERS;s++) {
+for (int s=0;s<HATE_NUMBER_SCREENS;s++) {
   if (game->screens.enabled[s]) {
     hate_screen *screen = &(game->screens.screens[s]);
     onec->viewMatrix = screen->screenViewMatrix;
@@ -344,9 +384,22 @@ for (int s=0;s<HATE_NUMBER_PLAYERS;s++) {
 //    glUniformMatrix4fv(onec->mMVPMatrixHandle, 1, GL_FALSE, (GLfloat *)(&onec->viewMatrix));
     checkGlError("setmatrix");
     
-  for (int i=0;i<HATE_NUMBER_PLANETS;i++) { // for each  planet
-    video_planet_draw(game,screen,i);
-    }
+    for (int planet_id=0;planet_id<HATE_NUMBER_PLANETS;planet_id++) { // for each  planet
+      for (int robot_id=0;robot_id<HATE_NUMBER_ROBOTS;robot_id++) { 
+        video_robot_draw(game,screen,planet_id,robot_id,1); //  could be behind planet, so do negative only
+	}
+      }
+      
+    for (int i=0;i<HATE_NUMBER_PLANETS;i++) { // for each  planet
+      video_planet_draw(game,screen,i);
+      }
+      
+      
+    for (int planet_id=0;planet_id<HATE_NUMBER_PLANETS;planet_id++) { // for each  planet
+      for (int robot_id=0;robot_id<HATE_NUMBER_ROBOTS;robot_id++) {
+        video_robot_draw(game,screen,planet_id,robot_id,0);   // not negative
+	}
+      }
     
 	    
 #ifdef OLDER	   

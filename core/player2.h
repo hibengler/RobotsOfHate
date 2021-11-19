@@ -20,6 +20,7 @@ typedef unsigned char uchar;
 #include "onecolor_specs.h"
 
 #define HATE_NUMBER_ROBOTS 5
+#define HATE_NUMBER_SCREENS 5
 #define HATE_NUMBER_PLAYERS 5
 #define HATE_NUMBER_PLAYERS_PLUS_1 (5+1)
 #define HATE_NUMBER_PLANETS 5
@@ -112,6 +113,7 @@ typedef struct hate_thing {
   } hate_thing;
   
 typedef struct hate_robot {
+  uchar mode;
   uchar thing_id;
   } hate_robot;
 
@@ -173,7 +175,7 @@ typedef struct hate_planet {
 
 
 typedef struct hate_screen {
-  int player_id;
+  int central_planet_id;  // usually my_player_id unless multiscreen then the planet_id of the screenin the center
   glMatrix screenViewMatrix;
   int robot_choices[HATE_NUMBER_PLANETS];
   int rps_choices[3];  // rps_choices has the screen scramble up rps
@@ -181,8 +183,8 @@ typedef struct hate_screen {
   } hate_screen; 
   
 typedef struct hate_screens {
-  int enabled[HATE_NUMBER_PLAYERS];
-  hate_screen screens[HATE_NUMBER_PLAYERS];
+  int enabled[HATE_NUMBER_SCREENS];
+  hate_screen screens[HATE_NUMBER_SCREENS];
   } hate_screens;
  
 

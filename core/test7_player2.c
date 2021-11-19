@@ -744,8 +744,8 @@ hate_game *game = &the_hate_game;
 
 	  
   	  for (int planet_id=0;planet_id<5;planet_id++) {
- 	    int screen_number = screen->player_id;
-	    int  plx = placement[screen_number*5+planet_id];
+ 	    int central_planet_id = screen->central_planet_id;
+	    int  plx = placement[central_planet_id*5+planet_id];
 	
 	    float d=1.3333333333f;
 	    float o=0.2f;
@@ -794,8 +794,8 @@ hate_screen *screen = &game->screens.screens[0];
         glBindBuffer(GL_ARRAY_BUFFER, 0);	
 	
 	for (int planet_id=0;planet_id<5;planet_id++) {
- 	  int screen_number = screen->player_id;
-	  int  plx = placement[screen_number*5+planet_id];
+ 	  int central_planet_id = screen->central_planet_id;
+	  int  plx = placement[central_planet_id*5+planet_id];
 	
 	  float d=0.6666666666666666f;
 	  float o=0.1f;

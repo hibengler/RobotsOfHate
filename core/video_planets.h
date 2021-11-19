@@ -58,6 +58,9 @@ void *expansion1;
 void *expansion2;
 } video_planet;
 
+typedef struct video_planets {
+struct video_planet *planets_by_shape[5]; // the hate_screen planet choices to figure out which shape
+} video_planets;
 
 
 
@@ -65,13 +68,18 @@ void *expansion2;
 
 
 
-
-
-
-void video_planet_init();
+void video_planet_init(hate_game *game);
 
 extern void video_planet_draw(hate_game *game,hate_screen *screen,int planet_id);
 extern void video_planet_step(hate_game *game);
+
+
+extern int video_initiate_color_saturation(hate_game *game, int planet_number);
+/* called during steps of video_robots or video_actions.  This will initiate showing the color of the planet -- if it wasent already done
+  Returns 1 if this is the first time, otherwise does nothing
+  
+so when the attack gets to the planet, we show the planet!!!  
+*/
 
 #endif
 

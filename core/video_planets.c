@@ -43,8 +43,8 @@ for (int i=0;i<dat->number_indexes;i++) {
   dat->final_vertexes[i*4+2]=dat->vertexes[index*4+2];
   dat->final_vertexes[i*4+3]=1.f;
   
-  
   int ic = i/3;
+//  fprintf(stderr,"i %d ic %d %f,%f,%f was %f,%f,%f\n",i,ic,dat->colors[ic*4],dat->colors[ic*4+1],dat->colors[ic*4+2], dat->final_colors[i*4+0], dat->final_colors[i*4+1], dat->final_colors[i*4+2]);
   dat->final_colors[i*4]=dat->colors[ic*4];
   dat->final_colors[i*4+1]=dat->colors[ic*4+1];
   dat->final_colors[i*4+2]=dat->colors[ic*4+2];
@@ -66,7 +66,7 @@ float saturation = cn->color_saturation;
 float not_sat = 1.0f - saturation;
 
 for (int i=0;i<5;i++) {
-  use_type[i]=i; // for noq
+  use_type[i]=4; 
   }
 use_type[3]=3; // show the ocean  
 
@@ -98,6 +98,7 @@ for(int i=0;i<c->number_triangles;i++) {
   int type=c->types[i];
   float *dest = &dat->colors[i*4];
   float *src = &c->mixed_colors[type][0];
+//  fprintf(stderr,"i %d type %d src %f,%f,%f dest was %f,%f,%f\n",i,type,src[0],src[1],src[2],dest[0],dest[1],dest[2]);
   dest[0]=src[0];
   dest[1]=src[1];
   dest[2]=src[2];
@@ -262,17 +263,34 @@ for(int i=0;i<e->number_vertexes;i++) {
 }
 
 
-static void update_colors_via_saturation(hate_game *game,int planet_id,video_planet *planetg) {
+
+static void step_saturation_colors_if_triggered(hate_game *game,int planet_id,video_planet *planetg) {
+video_planet_data *f = planetg->final;
+if ((f->color_info.color_saturation >0.f)&&(f->color_info.color_saturation != 1.f)) {
+  f->color_info.color_saturation += 1.f/300.f;
+  if (f->color_info.color_saturation >= 1.f) {
+    f->color_info.color_saturation = 1.f;
+    }
+  }
+}
+
+
+
+
+static int update_colors_via_saturation(hate_game *game,int planet_id,video_planet *planetg) {
+video_planet_data *f = planetg->final;
 
 video_planet_data *e = planetg->expanded;
-video_planet_data *f = planetg->final;
 if (f->color_info.color_saturation != e->color_info.color_saturation) {
+//  fprintf(stderr,"make_colors %d %f %f\n",planet_id, e->color_info.color_saturation,f->color_info.color_saturation);
   e->color_info.color_saturation = f->color_info.color_saturation;
   compute_mixed_colors(&e->color_info,&e->color_info);
   compute_mixed_colors(&f->color_info,&f->color_info);
   make_data_colors_from_mixed_color(e);
   make_data_colors_from_mixed_color(f);
+  return 1;
   }
+return 0;
 }
 
 
@@ -288,15 +306,22 @@ static void generic_draw_planet(hate_game *game,hate_screen *screen,int planet_i
      checkGlError("use m program");
 #ifndef newdraw     		
         glBindBuffer(GL_ARRAY_BUFFER, planetg->gl_vertex_buf);
+glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat)*4*planetg->final->number_indexes, &planetg->final->final_vertexes[0], GL_DYNAMIC_DRAW);
+checkGlError("mc");
     glVertexAttribPointer(multic->gvPositionHandle, 4, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
      checkGlError("draw2");
    glEnableVertexAttribArray(multic->gvPositionHandle);
      
+
     
     glBindBuffer(GL_ARRAY_BUFFER, planetg->gl_multicolor_buf);
+     checkGlError("drsssssaw2");
+glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat)*4*planetg->final->number_indexes, &planetg->final->final_colors[0], GL_DYNAMIC_DRAW);
+checkGlError("mc");
     glVertexAttribPointer(multic->gvColorHandle, 4, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
      checkGlError("draw2");
     glEnableVertexAttribArray(multic->gvColorHandle);
+     checkGlError("eejkejkl");
 
     
 	    
@@ -381,6 +406,9 @@ hate_rps view_rps;
 for (int i=0;i<4;i++) {
   view_rps.rps[i] = newinfo->actual_rps.rps[newinfo->rps_order[i]];
   }
+
+
+newinfo->color_saturation=oldinfo->color_saturation;
 
 // default out rps colors
 for (int i=0;i<4;i++) {
@@ -754,6 +782,10 @@ return out;
 
 
 
+
+
+
+
 static video_planet_color_info * copy_video_color_info(video_planet_color_info *out,video_planet_color_info *in) {
 
 out->actual_rps = in->actual_rps;
@@ -919,6 +951,9 @@ checkGlError("d");
 glBindBuffer(GL_ARRAY_BUFFER, 0);
 checkGlError("e");
 
+
+
+
 glGenBuffers(1,&planetg->gl_multicolor_buf);
 checkGlError("getvertex");
 glBindBuffer(GL_ARRAY_BUFFER,planetg->gl_multicolor_buf);
@@ -942,17 +977,12 @@ checkGlError("me");
 //checkGlError("getvertex");
 //glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,planetg->gl_multicolor_buf);
 
-
-glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat)*4*ninit, &planetg->final->final_colors[0], GL_DYNAMIC_DRAW);
-checkGlError("mc");
-glVertexAttribPointer(multic->gvColorHandle, 4, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
-glEnableVertexAttribArray(planetg->gl_multicolor_buf);
+//glEnableVertexAttribArray(planetg->gvColorHandle);
 checkGlError("md"); 
    glDisableVertexAttribArray(multic->gvPositionHandle);
     glDisableVertexAttribArray(multic->gvColorHandle);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
-glBindBuffer(GL_ARRAY_BUFFER, 0);
 checkGlError("me");
 
 
@@ -971,9 +1001,7 @@ checkGlError("useprogram");
 
 
 
-
 video_planet the_video_planet_tetrahedron;
-
 
 
 
@@ -1008,7 +1036,7 @@ generate_colors(planetg->base,actual_rps,rps_view,color_saturation,other_color);
 
 // hack;
 
-planetg->base->color_info.color_saturation=0.0;
+//planetg->base->color_info.color_saturation=0.0;
 
 compute_mixed_colors(&planetg->base->color_info,&planetg->base->color_info);
 make_data_colors_from_mixed_color(planetg->base);
@@ -1034,7 +1062,7 @@ free_video_data(intermediate2);
 free_video_data(intermediate3);
 //free_video_data(intermediate4);
 
-planetg->expanded->color_info.color_saturation=0.0;
+//planetg->expanded->color_info.color_saturation=0.0;
 compute_mixed_colors(&planetg->expanded->color_info,&planetg->expanded->color_info);
 make_data_colors_from_mixed_color(planetg->expanded);
 
@@ -1073,11 +1101,13 @@ rotation_step(game,planet_id,planetg);
 
 //shake_planet(game,planet_id,planetg,0.10);
 
+step_saturation_colors_if_triggered(game,planet_id,planetg);
 update_colors_via_saturation(game,planet_id,planetg);
 
 transfer_vertexes_to_indexes(planetg->final);
 
 }
+
 
 
 void video_planet_draw0_tetrahedron(hate_game *game,hate_screen *screen,int planet_id) {
@@ -1176,6 +1206,7 @@ rotation_step(game,planet_id,planetg);
 
 shake_planet(game,planet_id,planetg,0.10);
 
+step_saturation_colors_if_triggered(game,planet_id,planetg);
 update_colors_via_saturation(game,planet_id,planetg);
 
 transfer_vertexes_to_indexes(planetg->final);
@@ -1282,6 +1313,7 @@ rotation_step(game,planet_id,planetg);
 
 shake_planet(game,planet_id,planetg,0.10);
 
+step_saturation_colors_if_triggered(game,planet_id,planetg);
 update_colors_via_saturation(game,planet_id,planetg);
 
 transfer_vertexes_to_indexes(planetg->final);
@@ -1445,6 +1477,7 @@ rotation_step(game,planet_id,planetg);
 
 shake_planet(game,planet_id,planetg,0.10);
 
+step_saturation_colors_if_triggered(game,planet_id,planetg);
 update_colors_via_saturation(game,planet_id,planetg);
 
 transfer_vertexes_to_indexes(planetg->final);
@@ -1531,11 +1564,11 @@ multi_finish_binding_for_init(planetg);
 static void video_planet_step4_icosahedron(hate_game *game,int planet_id) {
 video_planet *planetg = &the_video_planet_icosahedron;
 
-
 rotation_step(game,planet_id,planetg);
 
 shake_planet(game,planet_id,planetg,0.10);
 
+step_saturation_colors_if_triggered(game,planet_id,planetg);
 update_colors_via_saturation(game,planet_id,planetg);
 
 
@@ -1571,12 +1604,7 @@ generic_draw_planet(game,screen,planet_id,planetg);
 
 
 
-static video_planet *all_video_planets[5];
-
-
-
-
-
+static video_planets all_video_planets;
 
 
 
@@ -1605,21 +1633,23 @@ static float pos_translate[] = {0.f,0.f,0.f,
 
 
 void video_planet_draw(hate_game *game,hate_screen *screen,int planet_id) {
-int screen_number = screen->player_id;
 
-//fprintf(stderr,"screen %d	planet %d   plx %d	show %d\n",screen_number,planet_id, placement[screen_number*5+planet_id],screen->planet_choices[planet_id]);
+int central_planet_id = screen->central_planet_id; 
 glMatrix r;
 loadIdentity(&r);
 int show_planet = screen->planet_choices[planet_id];
 
 
-int  plx = placement[screen_number*5+planet_id];
+int  plx = placement[central_planet_id*5+planet_id];
+
+
+//fprintf(stderr,"central_planet %d	planet %d   plx %d	show %d\n",central_planet_id,planet_id, placement[screen_number*5+planet_id],screen->planet_choices[planet_id]);
 
 translateMatrix(&r,translate_size*pos_translate[plx*3],
   translate_size*pos_translate[plx*3+1],
   translate_size*pos_translate[plx*3+2]);
 scaleMatrix(&r,placement_scale,placement_scale,placement_scale);
-video_planet *pl = all_video_planets[show_planet];
+video_planet *pl = all_video_planets.planets_by_shape[show_planet];
 if (pl) {
 //  fprintf(stderr,"rotayion %f,%f,%f\n",pl->rotation[0]*360./6.28318530718f,pl->rotation[1]*360./6.28318530718f,pl->rotation[2]*360./6.28318530718f);
   rotationMatrix(&r,pl->rotation[0]*360./6.28318530718f,1.f,0.f,0.f);
@@ -1662,6 +1692,7 @@ checkGlError("draw");
 
 
 void video_planet_step(hate_game *game) {
+
   video_planet_step0_tetrahedron(game,0);
   video_planet_step1_cube(game,1);
   video_planet_step2_diamond(game,2);
@@ -1676,77 +1707,115 @@ void video_planet_step(hate_game *game) {
 
 
 
+int video_initiate_color_saturation(hate_game *game, int planet_number)
+{
+hate_screen *screen = &game->screens.screens[0];
+int central_planet_id = screen->central_planet_id; 
+int show_planet = screen->planet_choices[planet_number];
 
-
-
-void video_planet_init() {
-hate_rps actual_rps_tetrahedron;
-actual_rps_tetrahedron.rps[0]=1.f;
-actual_rps_tetrahedron.rps[1]=0.1f;
-actual_rps_tetrahedron.rps[2]=0.1f;
-actual_rps_tetrahedron.rps[3]=1.f/20.f;
-
-hate_rps actual_rps_cube;
-actual_rps_cube.rps[0]=0.1f;
-actual_rps_cube.rps[1]=1.f;
-actual_rps_cube.rps[2]=0.1f;
-actual_rps_cube.rps[3]=1.f/20.f;
-
-
-
-hate_rps actual_rps_diamond;
-actual_rps_diamond.rps[0]=0.1f;
-actual_rps_diamond.rps[1]=0.1f;
-actual_rps_diamond.rps[2]=1.f;
-actual_rps_diamond.rps[3]=1.f/20.f;
+video_planet *planetg = all_video_planets.planets_by_shape[show_planet];
+video_planet_data *f = planetg->final;
+if (f->color_info.color_saturation == 0.f) {
+  f->color_info.color_saturation = 1.f/300.f;
+  fprintf(stderr,"\nSATURATE\n");
+  return 1;
+  }
+return 0;
+}
 
 
 
 
 
-hate_rps actual_rps_dodecahedron;
-actual_rps_dodecahedron.rps[0]=1.1f;
-actual_rps_dodecahedron.rps[1]=1.1f;
-actual_rps_dodecahedron.rps[2]=1.f;
-actual_rps_dodecahedron.rps[3]=1.f/20.f;
 
+// This is separated from video_planet_init, so later when we join into a game, it can be initted here 
 
+void video_planet_init_shape(hate_game *game,hate_screen *base_screen,hate_frame *frame,
+  int my_player_id,int shape_id,int planet_number) {
+float color_saturation = 0.;
 
+hate_planet *planet = &frame->planets[planet_number];
+hate_thing *thing = &frame->things[planet->thing_id];
 
+fprintf(stderr,"planet planet_number %d   me: %d  shape  %d\n",planet_number, my_player_id,shape_id);
 
-hate_rps actual_rps_icosahedron;
-actual_rps_icosahedron.rps[0]=1.1f;
-actual_rps_icosahedron.rps[1]=0.1f;
-actual_rps_icosahedron.rps[2]=1.f;
-actual_rps_icosahedron.rps[3]=1.f/20.f;
+if (my_player_id==HATE_NUMBER_PLAYERS) { // the overview player
+  color_saturation = 1.; // we see all colors
+  }
+else {
+  int player_id =planet->player_id;
+  if (player_id==my_player_id) {
+    color_saturation = 1.;  // This is our planet
+    }
+  }
+hate_rps strength = thing->strength;
 
-
+fprintf(stderr,"saturation %f strength %f,%f,%f\n",color_saturation,strength.rps[0],strength.rps[1],strength.rps[2]);
 /* rps vier has to be 0123, 1203, 2013 */
 int rps_view[4];
-rps_view[0]=0;
-rps_view[1]=1;
-rps_view[2]=2;
+rps_view[0]=base_screen->rps_choices[0];
+rps_view[1]=base_screen->rps_choices[1];
+rps_view[2]=base_screen->rps_choices[2];
 rps_view[3]=3;
 
-float color_saturation=0.f;
 
 float other_color[4];
-other_color[0]=0.6f;
-other_color[1]=0.6f;
-other_color[2]=0.6f;
+other_color[0]=0.5f;
+other_color[1]=0.5f;
+other_color[2]=0.5f;
 other_color[3]=1.f;
 
-video_planet_init_tetrahedron(actual_rps_tetrahedron,rps_view,color_saturation, other_color);
-video_planet_init_cube(actual_rps_cube,rps_view,color_saturation, other_color);
-video_planet_init_diamond(actual_rps_diamond,rps_view,color_saturation, other_color);
-video_planet_init_dodecahedron(actual_rps_dodecahedron,rps_view,color_saturation, other_color);
-video_planet_init_icosahedron(actual_rps_icosahedron,rps_view,color_saturation, other_color);
 
-all_video_planets[0] = &the_video_planet_tetrahedron; 
-all_video_planets[1] = &the_video_planet_cube; 
-all_video_planets[2] = &the_video_planet_diamond; 
-all_video_planets[3] = &the_video_planet_dodecahedron;
-all_video_planets[4] = &the_video_planet_icosahedron;
+larry_harvey_robot *probot = &game->larry_harvey_robot_league->teams[base_screen->robot_choices[planet_number]].players[0];
+not_rl_Color robot_color = probot->usual_first_color;
+float other_mix_color[4];
+other_mix_color[0] = (float)(robot_color.r)/255.f;
+other_mix_color[1] = (float)(robot_color.g)/255.f;
+other_mix_color[2] = (float)(robot_color.b)/255.f;
+other_mix_color[3] = (float)(robot_color.a)/255.f;
 
+fprintf(stderr,"color %f,%f,%f\n",other_mix_color[0],other_mix_color[1],other_mix_color[2]);
+
+other_color[0] = other_mix_color[0]*0.4;
+other_color[1] = other_mix_color[1]*0.4;
+other_color[2] = other_mix_color[2]*0.4;
+other_color[3] = 1.;
+
+if (shape_id==0) {
+  video_planet_init_tetrahedron(strength,rps_view,color_saturation, other_color);
+  }
+else if (shape_id==1) {
+  video_planet_init_cube(strength,rps_view,color_saturation, other_color);
+  }
+else if (shape_id==2) {
+  video_planet_init_diamond(strength,rps_view,color_saturation, other_color);
+  }
+else if (shape_id==3) {
+  video_planet_init_dodecahedron(strength,rps_view,color_saturation, other_color);
+  }
+else {
+  video_planet_init_icosahedron(strength,rps_view,color_saturation, other_color);
+  }
+}
+
+
+void video_planet_init(hate_game *game) {
+
+
+
+all_video_planets.planets_by_shape[0] = &the_video_planet_tetrahedron;
+all_video_planets.planets_by_shape[1] = &the_video_planet_cube; 
+all_video_planets.planets_by_shape[2] = &the_video_planet_diamond; 
+all_video_planets.planets_by_shape[3] = &the_video_planet_dodecahedron;
+all_video_planets.planets_by_shape[4] = &the_video_planet_icosahedron;
+
+int planet_number;
+for (int planet_number=0;planet_number<HATE_NUMBER_PLANETS;planet_number++) {
+  hate_screen *base_screen = &game->screens.screens[0];  
+  hate_frame *frame = &game->frames[game->current_frame]; //??? might be new frame for step
+  
+  int shape_id = base_screen->planet_choices[planet_number];
+  video_planet_init_shape(game,base_screen,frame,game->my_player_id,shape_id,planet_number);
+  }
 }
 
