@@ -263,7 +263,7 @@ init_multicolor_specs(multic,onec);
     player2_game_init(&the_hate_game,participant_id); // that is out player id
 
     loadIdentity(&onec->projectionMatrix);
-    perspectiveGL(&onec->projectionMatrix,45.f, ((GLfloat)w)/((GLfloat)h),  -4.f, 4.f);
+    perspectiveGL(&onec->projectionMatrix,45.f, ((GLfloat)w)/((GLfloat)h),  -20.f, 20.f);
     
     
     fprintf(stderr,"done player2_game_init\n");
@@ -326,8 +326,10 @@ init_multicolor_specs(multic,onec);
     glUseProgram(multic->multi_color_program);
     checkGlError("useprogram");
     activate_matrix_handle(multic->gvPositionHandle);
+    glDisable(GL_CULL_FACE);
    
     glUseProgram(onec->one_color_program);
+    glDisable(GL_CULL_FACE);
     checkGlError("useprogram");
     
 
@@ -705,6 +707,8 @@ hate_game *game = &the_hate_game;
 
         glUseProgram(onec->one_color_program);
 	checkGlError("useprogram");
+	
+	
         glUniform4f(onec->colorHandle, this_foreground[0],this_foreground[1],this_foreground[2],this_foreground[3]);
     loadIdentity(&onec->viewMatrix);
     loadIdentity(&onec->modelMatrix);
@@ -746,7 +750,7 @@ hate_game *game = &the_hate_game;
 	    float d=1.3333333333f;
 	    float o=0.2f;
 	    float w=0.16f;
-  	    float zdiff = 1.0f;
+  	    float zdiff = 0.0f;
 	    char xx[2];
 	    xx[0]='0' + planet_id;
 	    xx[1]='\0';
@@ -796,7 +800,7 @@ hate_screen *screen = &game->screens.screens[0];
 	  float d=0.6666666666666666f;
 	  float o=0.1f;
 	  float w=0.16f;
-	  float zdiff = 1.0f;
+	  float zdiff = 0.0f;
 	  char xx[2];
 	  xx[0]='0' + planet_id;
 	  xx[1]='\0';
@@ -842,8 +846,8 @@ if (participant_number==5) {
   screen_height = 2100;
   }
 else {
-  screen_width = 760;
-  screen_height = 760;
+  screen_width = 1024;
+  screen_height = 1024;
   }
 
     GLFWwindow* window;
@@ -864,9 +868,11 @@ else {
 
     setup_graphics_for_letters_and_robots(participant_number, screen_width, screen_height);	// this has a matrix to do 3d model, effect, etc
 
-    
+//    glEnable(GL_DEPTH_TEST);
 
-    glClearColor(0.0f, 0.0f, 0.3f, 1.0f);
+    glClearColor(0.0f, 0.0f, 0.2f, 1.0f);
+ //   glClear( GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
+    
     glViewport(0, 0, screen_width, screen_height);
 	checkGlError("vp");
 

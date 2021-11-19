@@ -291,7 +291,7 @@ static const GLfloat tetrahedronVerts[4][3] = {
         {  0.0,  0.0,  1.0, 1.0   },   // blue //
         {  1.0,  1.0,  1.0, 1.0   } }; // white //
 
-static const GLushort tetrahedronIndices[12] = //GL_TRIANGLE_STRIP version- see glDrawElements { 0, 1, 2, 3, 0, 1 } remember [6];
+static const GLushort tetrahedronIndices[] = //GL_TRIANGLE_STRIP version- see glDrawElements { 0, 1, 2, 3, 0, 1 } remember [6];
 {
  0,1,2,//rgb
  2,1,3,

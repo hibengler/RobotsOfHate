@@ -2,10 +2,10 @@
 
 
 
-
 #include "video_planets.h"
 #include <sys/time.h>
 
+#include "multicolor_specs.h"
 
 #include "crystals_geo.h"
 
@@ -43,7 +43,61 @@ for (int i=0;i<dat->number_indexes;i++) {
   dat->final_colors[i*4+1]=dat->colors[ic*4+1];
   dat->final_colors[i*4+2]=dat->colors[ic*4+2];
   dat->final_colors[i*4+3]=dat->colors[ic*4+3];
+//  dat->final_colors[i*4+3]=1.f;
   }
+  
+  
+}
+
+
+
+
+static void compute_mixed_colors(video_planet_color_info *co,video_planet_color_info *cn) {
+
+int use_type[5];
+
+float saturation = cn->color_saturation;
+float not_sat = 1.0f - saturation;
+
+for (int i=0;i<5;i++) {
+  use_type[i]=i; // for noq
+  }
+use_type[3]=3; // show the ocean  
+
+for (int i=0;i<5;i++) {
+  int type=i;
+  int me_type = use_type[i];
+  float *dest = &cn->mixed_colors[type][0];
+  float *orig = &co->rps_colors[type][0];
+  float *cover = &co->rps_colors[me_type][0];
+  
+  dest[0] = saturation*orig[0] + not_sat*cover[0];
+  dest[1] = saturation*orig[1] + not_sat*cover[1];
+  dest[2] = saturation*orig[2] + not_sat*cover[2];
+  dest[3] = saturation*orig[3] + not_sat*cover[3];
+  
+  if (dest[0]>1.f) dest[0]=1.f;
+  if (dest[1]>1.f) dest[1]=1.f;
+  if (dest[2]>1.f) dest[2]=1.f;
+  if (dest[3]>1.f) dest[3]=1.f;
+  }
+}
+
+
+
+static void make_data_colors_from_mixed_color(video_planet_data *dat) {
+
+video_planet_color_info *c = &dat->color_info;
+for(int i=0;i<c->number_triangles;i++) {
+  int type=c->types[i];
+  float *dest = &dat->colors[i*4];
+  float *src = &c->mixed_colors[type][0];
+  dest[0]=src[0];
+  dest[1]=src[1];
+  dest[2]=src[2];
+  dest[3]=src[3];
+  }    
+
 }
 
 
@@ -51,12 +105,9 @@ for (int i=0;i<dat->number_indexes;i++) {
 
 
 
-
-
-
-static float normal_rock_color[4] = {0.58f,0.294f,0.0f,1.f};
-static float normal_paper_color[4] = {0.0f,0.8f,0.0f,1.f};
-static float normal_scissors_color[4] = {0.8313f,0.686f,0.215f,1.f};
+static float normal_rock_color[4] = {0.50f,0.284f,0.0f,1.f};
+static float normal_paper_color[4] = {0.0f,0.6f,0.0f,1.f};
+static float normal_scissors_color[4] = {1.f,0.686f,0.f,1.f};
 static float normal_water_color[4] = {0.0f,0.0f,0.9f,1.f};
 static float normal_other_color[4] = {0.5f,0.5f,0.5f,1.f};
 
@@ -106,6 +157,8 @@ for (int i=0;i<4;i++) {
 
 info->color_saturation = color_saturation;
 
+compute_mixed_colors(info,info);
+
 int water_choice_amt = ((rand()) & 32767) + 16384 ; /* 25 to 74% water 1023 */
 info->water_ratio = ((float)water_choice_amt) / 65536.f;
 
@@ -128,8 +181,30 @@ int number_above = (info->number_triangles-actual_number_water);
 int number_left = number_above;
 int number_rock = (int)(  (float)number_left *  view_rps.rps[0]);
 int number_paper = (int)(  (float)number_left *  view_rps.rps[1]);
-int number_scissors = number_left - number_rock - number_paper;
+int number_scissors =  (int)(  (float)number_left *  view_rps.rps[2]);
 
+if (number_rock+number_paper+number_scissors <number_left) {
+  if (number_rock==0) number_rock++;
+  }
+if (number_rock+number_paper+number_scissors <number_left) {
+  if (number_paper==0) number_paper++;
+  }
+if (number_rock+number_paper+number_scissors <number_left) {
+  if (number_scissors==0) number_scissors++;
+  }
+  
+
+while (number_rock+number_paper+number_scissors <number_left) {
+  if (number_rock+number_paper+number_scissors <number_left) {
+    number_rock++;
+    }    
+  if (number_rock+number_paper+number_scissors <number_left) {
+    number_paper++;
+    }    
+  if (number_rock+number_paper+number_scissors <number_left) {
+    number_scissors++;
+    }    
+  }
 
 int i=0;
 while (number_left) {  
@@ -153,12 +228,124 @@ while (number_left) {
     }
   i++;
   }
+
+
+
+
+make_data_colors_from_mixed_color(dat);
 }
 
 
 
 
 
+
+
+static void shake_planet(hate_game *game,int player_id,video_planet *planetg,float amount) {
+
+video_planet_data *e = planetg->expanded;
+video_planet_data *f = planetg->final;
+ 
+for(int i=0;i<e->number_vertexes;i++) {
+  float factor = (1.0-amount*0.5) + ((float)((unsigned int)(rand())&65535))* amount/65535.f;
+  f->vertexes[i*4]= e->vertexes[i*4] * factor;
+  f->vertexes[i*4+1]= e->vertexes[i*4+1] * factor;
+  f->vertexes[i*4+2]= e->vertexes[i*4+2] * factor;
+  }
+}
+
+
+static void update_colors_via_saturation(hate_game *game,int planet_id,video_planet *planetg) {
+return; // ???
+video_planet_data *e = planetg->expanded;
+video_planet_data *f = planetg->final;
+//if (f->color_info.color_saturation != e->color_info.color_saturation) {
+{
+  e->color_info.color_saturation = f->color_info.color_saturation;
+  compute_mixed_colors(&e->color_info,&e->color_info);
+  compute_mixed_colors(&f->color_info,&f->color_info);
+  make_data_colors_from_mixed_color(e);
+  make_data_colors_from_mixed_color(f);
+  }
+}
+
+
+
+
+
+
+
+static void generic_draw_planet(hate_game *game,hate_screen *screen,int planet_id,video_planet *planetg) {
+
+  int show_planet = screen->planet_choices[planet_id];
+   glUseProgram(multic->multi_color_program);
+     checkGlError("use m program");
+#ifndef newdraw     		
+        glBindBuffer(GL_ARRAY_BUFFER, planetg->gl_vertex_buf);
+//        glUniform4f(multic->colorHandle, 0.8f,0.0f,0.0f,1.0f);
+    glVertexAttribPointer(multic->gvPositionHandle, 4, GL_FLOAT, GL_FALSE, 16, (GLvoid*)0);
+     checkGlError("draw2");
+   glEnableVertexAttribArray(multic->gvPositionHandle);
+     
+    
+    glBindBuffer(GL_ARRAY_BUFFER, planetg->gl_multicolor_buf);
+    glVertexAttribPointer(multic->gvColorHandle, 4, GL_FLOAT, GL_FALSE, 16, (GLvoid*)0);
+     checkGlError("draw2");
+    glEnableVertexAttribArray(multic->gvColorHandle);
+
+    
+	    
+	    
+
+    glDrawArrays(GL_TRIANGLES, 0, (planetg->final->number_indexes));
+     checkGlError("draw");
+
+     
+     
+
+   glDisableVertexAttribArray(multic->gvPositionHandle);
+    glDisableVertexAttribArray(multic->gvColorHandle);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+ glUseProgram(onec->one_color_program);
+     checkGlError("use m program");
+    
+#else
+
+
+// tru element
+
+
+
+        glBindBuffer(GL_ARRAY_BUFFER, planetg->gl_vertex_buf);
+//        glUniform4f(multic->colorHandle, 0.8f,0.0f,0.0f,1.0f);
+    glVertexAttribPointer(multic->gvPositionHandle, 4, GL_FLOAT, GL_FALSE, 16, (GLvoid*)0);
+     checkGlError("draw2");
+   glEnableVertexAttribArray(multic->gvPositionHandle);
+     
+    
+    glBindBuffer(GL_ARRAY_BUFFER, planetg->gl_multicolor_buf);
+    glVertexAttribPointer(multic->gvColorHandle, 4, GL_FLOAT, GL_FALSE, 16, (GLvoid*)0);
+     checkGlError("draw2");
+    glEnableVertexAttribArray(multic->gvColorHandle);
+
+    
+
+
+    
+	    
+    gkDrawarraysfd(GL_TRIANGLES, 0, (planetg->final->number_indexes));
+     checkGlError("draw");
+     
+   glDisableVertexAttribArray(multic->gvPositionHandle);
+    glDisableVertexAttribArray(multic->gvColorHandle);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+ glUseProgram(onec->one_color_program);
+     checkGlError("use m program");
+    
+#endif
+}
 
 
 
@@ -197,6 +384,12 @@ for (int i=0;i<4;i++) {
    newinfo->rps_colors[2][i] = oldinfo->rps_colors[2][i];
    newinfo->rps_colors[3][i] = oldinfo->rps_colors[3][i];
    newinfo->rps_colors[4][i] = oldinfo->rps_colors[4][i];
+   
+   newinfo->mixed_colors[0][i] = oldinfo->mixed_colors[0][i];
+   newinfo->mixed_colors[1][i] = oldinfo->mixed_colors[1][i];
+   newinfo->mixed_colors[2][i] = oldinfo->mixed_colors[2][i];
+   newinfo->mixed_colors[3][i] = oldinfo->mixed_colors[3][i];
+   newinfo->mixed_colors[4][i] = oldinfo->mixed_colors[4][i];
    }
 
 
@@ -239,11 +432,14 @@ We sum up rocks and sum up papers, and sum up scissors and sum up waters - and m
 
 // Init:
 
-for (int i=0;i<new->number_indexes;i++) {
+
+
+
+for (int i=0;i<(new->number_indexes);i++) {
   new->final_vertexes[i*4]=0.f;
   new->final_vertexes[i*4+1]=0.f;
   new->final_vertexes[i*4+2]=0.f;
-  new->final_vertexes[i*4+3]=0.f;
+  new->final_vertexes[i*4+3]=1.f;
   }
 
 
@@ -283,8 +479,39 @@ if (number_rock<0) number_rock=0;
 
 int number_paper = (int)(  (float)(number_total-number_water) *  view_rps.rps[1]) - actual_number_paper;
 if (number_paper<0) number_paper=0;
-int number_scissors = number_left - number_water - number_rock - number_paper;
+int number_scissors = (int)(  (float)(number_total-number_water) *  view_rps.rps[2]) - actual_number_paper;
 if (number_scissors<0) number_paper=0;
+
+
+
+if (number_rock+number_paper+number_scissors+number_water <number_left) {
+  if (number_water==0) number_water++;
+  }
+if (number_rock+number_paper+number_scissors+number_water <number_left) {
+  if (number_rock==0) number_rock++;
+  }
+if (number_rock+number_paper+number_scissors+number_water <number_left) {
+  if (number_paper==0) number_paper++;
+  }
+if (number_rock+number_paper+number_scissors+number_water <number_left) {
+  if (number_scissors==0) number_scissors++;
+  }
+  
+
+while (number_rock+number_paper+number_scissors+number_water <number_left) {
+  if (number_rock+number_paper+number_scissors+number_water <number_left) {
+    number_water++;
+    }
+  if (number_rock+number_paper+number_scissors+number_water <number_left) {
+    number_rock++;
+    }    
+  if (number_rock+number_paper+number_scissors+number_water <number_left) {
+    number_paper++;
+    }    
+  if (number_rock+number_paper+number_scissors+number_water <number_left) {
+    number_scissors++;
+    }    
+  }
 
 ci=0;
 while (number_left) {  
@@ -323,10 +550,10 @@ while (number_left) {
       scissors_ratio = ((float)type_count[2])/((float)(count));
       }
 
-    int level_water = (int)(  water_ratio * (float)(number_water) * 15.f + (float)number_water);
-    int level_rock = level_water + (int)(  rock_ratio * (float)(number_rock) * 15.f + (float)number_rock);
-    int level_paper = level_rock + (int)(  paper_ratio * (float)(number_paper) * 15.f + (float)number_paper);
-    int level_scissors = level_scissors + (int)(  scissors_ratio * (float)(number_scissors) * 15.f + (float)number_scissors);
+    int level_water = (int)(  water_ratio * (float)(number_water) * 10.f + (float)number_water);
+    int level_rock = level_water + (int)(  rock_ratio * (float)(number_rock) * 10.f + (float)number_rock);
+    int level_paper = level_rock + (int)(  paper_ratio * (float)(number_paper) * 10.f + (float)number_paper);
+    int level_scissors = level_paper + (int)(  scissors_ratio * (float)(number_scissors) * 10.f + (float)number_scissors);
 
     unsigned int x = (rand() % level_scissors);
     if (x<level_water) {
@@ -349,7 +576,11 @@ while (number_left) {
     }
   ci++;
   }
+compute_mixed_colors(newinfo,newinfo);
+make_data_colors_from_mixed_color(new);
 }
+
+
 
 
 
@@ -357,21 +588,26 @@ while (number_left) {
 
 static video_planet_data *allocate_video_data(int vertexes,int indexes) {
 video_planet_data *dat = malloc(sizeof(video_planet_data));
+int nind=indexes;
+int ntry=indexes/3;
+
+
+
 
 memset((void *)dat,0,sizeof(video_planet_data));
 dat->number_vertexes = vertexes;
 dat->number_indexes = indexes;
 
-dat->indexes = malloc(sizeof(GLshort)*dat->number_indexes);
+dat->indexes = malloc(sizeof(GLshort)*nind);
 dat->vertexes = malloc(sizeof(GLfloat)*4*dat->number_vertexes);
-dat->colors = malloc(sizeof(GLfloat)*4*(dat->number_indexes/3));
-dat->final_vertexes = malloc(sizeof(GLfloat)*4*dat->number_indexes);
-dat->final_colors = malloc(sizeof(GLfloat)*4*dat->number_indexes);
+dat->colors = malloc(sizeof(GLfloat)*4*((nind)/3));
+dat->final_vertexes = malloc(sizeof(GLfloat)*4*nind);
+dat->final_colors = malloc(sizeof(GLfloat)*4*nind);
 
 video_planet_color_info *info = &dat->color_info;
 
-info->number_triangles = indexes/3;
-info->types = malloc(info->number_triangles);
+info->number_triangles = (indexes/3);
+info->types = malloc(ntry);
 
 return dat;
 }
@@ -472,7 +708,6 @@ for (int i=0;i<dat->number_indexes;i+=3) {
   int new_m3 = expand_locate_vertex(m3,&total_new_vectors,&out->vertexes[0],out->number_vertexes);
 
   // middle triangle
-  int c=total_new_indexes/3;
   out->indexes[total_new_indexes++] = new_m1;
   out->indexes[total_new_indexes++] = new_m2;
   out->indexes[total_new_indexes++] = new_m3;
@@ -521,6 +756,7 @@ for (int i=0;i<4;i++) {
   out->rps_order[i] = in->rps_order[i];
   for (int j=0;j<5;j++) {
     out->rps_colors[j][i] = in->rps_colors[j][i];
+    out->mixed_colors[j][i] = in->mixed_colors[j][i];
     }
   }
 
@@ -541,12 +777,31 @@ planetg->rotation[0] += planetg->rotation_delta[0];
 planetg->rotation[1] += planetg->rotation_delta[1];
 planetg->rotation[2] += planetg->rotation_delta[2];
 
-if (planetg->rotation[0]<0.f) {planetg->rotation[0] += 6.283185307f;}
-else if (planetg->rotation[0]>6.283185307f) {planetg->rotation[0] -= 6.283185307f;}
-if (planetg->rotation[1]<0.f) {planetg->rotation[1] += 6.283185307f;}
-else if (planetg->rotation[1]>6.283185307f) {planetg->rotation[1] -= 6.283185307f;}
-if (planetg->rotation[2]<0.f) {planetg->rotation[2] += 6.283185307f;}
-else if (planetg->rotation[2]>6.283185307f) {planetg->rotation[2] -= 6.283185307f;}
+#ifdef checks_dont_wok
+if (planetg->rotation[0]<0.f) {planetg->rotation[0] += 6.283185307f;
+
+//fprintf(stderr,"rotation bound 0\n");
+}
+else if (planetg->rotation[0]>6.283185307f) {planetg->rotation[0] -= 6.283185307f;
+//fprintf(stderr,"rotation bound 0b\n");
+
+}
+if (planetg->rotation[1]<0.f) {
+//fprintf(stderr,"rotation bound 1a\n");
+
+planetg->rotation[1] += 6.283185307f;}
+else if (planetg->rotation[1]>6.283185307f) {
+//fprintf(stderr,"rotation bound 1b\n");
+
+planetg->rotation[1] -= 6.283185307f;}
+if (planetg->rotation[2]<0.f) {
+
+//fprintf(stderr,"rotation bound 2a\n");
+
+planetg->rotation[2] += 6.283185307f;}
+else if (planetg->rotation[2]>6.283185307f) {
+planetg->rotation[2] -= 6.283185307f;}
+#endif
 
 }
 
@@ -562,26 +817,21 @@ for (i=0;i<new_indexes;i++) {
   out->indexes[i] = dat->indexes[i];
   }
 
-fprintf(stderr,"A %d\n",i);
 for (i=0;i<new_vertexes*4;i++) {
   out->vertexes[i] = dat->vertexes[i];
   }
-fprintf(stderr,"B %d\n",i);
 
-for (i=0;i<new_indexes/3*4;i++) {
+for (i=0;i<(dat->color_info.number_triangles)*4;i++) {
   out->colors[i] = dat->colors[i];
   }
-fprintf(stderr,"C %d\n",i);
 
 for (i=0;i<new_indexes*4;i++) {
   out->final_vertexes[i] = dat->final_vertexes[i];
   }
-fprintf(stderr,"D %d\n",i);
 
 for (i=0;i<new_indexes*4;i++) {
   out->final_colors[i] = dat->final_colors[i];
   }
-fprintf(stderr,"E %d\n",i);
   
   
 
@@ -623,6 +873,88 @@ if (rand()&1) {
 
 
 
+
+
+
+
+
+
+
+
+
+static void multi_bind_vertex_buffer(video_planet *planetg) {
+glUseProgram(multic->multi_color_program);
+checkGlError("useprogram");
+    
+glGenBuffers(1,&planetg->gl_vertex_buf);
+checkGlError("getvertex");
+glBindBuffer(GL_ARRAY_BUFFER,planetg->gl_vertex_buf);
+}
+
+
+
+
+
+
+
+static void multi_finish_binding_for_init(video_planet *planetg) {
+  glUseProgram(multic->multi_color_program);
+       checkGlError("use m program");
+       
+       
+int ninit = planetg->final->number_indexes;
+
+       
+      
+glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat)*4*ninit,  &planetg->final->final_vertexes[0], GL_DYNAMIC_DRAW);
+checkGlError("c");
+glVertexAttribPointer(multic->gvPositionHandle, 4, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
+//glEnableVertexAttribArray(multic->gvPositionHandle);
+checkGlError("d"); 
+glBindBuffer(GL_ARRAY_BUFFER, 0);
+checkGlError("e");
+
+glGenBuffers(1,&planetg->gl_multicolor_buf);
+checkGlError("getvertex");
+glBindBuffer(GL_ARRAY_BUFFER,planetg->gl_multicolor_buf);
+
+
+
+
+glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat)*4*ninit, &planetg->final->final_colors[0], GL_DYNAMIC_DRAW);
+checkGlError("mc");
+glVertexAttribPointer(multic->gvColorHandle, 4, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
+//glEnableVertexAttribArray(multic->gvColorHandle);
+checkGlError("md"); 
+glBindBuffer(GL_ARRAY_BUFFER, 0);
+checkGlError("me");
+
+
+
+
+
+glGenBuffers(1,&planetg->gl_element_array_buf);
+checkGlError("getvertex");
+glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,planetg->gl_multicolor_buf);
+
+
+glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat)*4*ninit, &planetg->final->final_colors[0], GL_DYNAMIC_DRAW);
+checkGlError("mc");
+//glVertexAttribPointer(multic->gvColorHandle, 4, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
+//glEnableVertexAttribArray(planetg->gl_multicolor_buf);
+checkGlError("md"); 
+glBindBuffer(GL_ARRAY_BUFFER, 0);
+checkGlError("me");
+
+glUseProgram(onec->one_color_program);
+checkGlError("useprogram");
+	
+
+}
+
+
+
+
 //vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvtetrahedron
 
 
@@ -634,14 +966,20 @@ video_planet the_video_planet_tetrahedron;
 
 
 
+
 static void video_planet_init_tetrahedron(hate_rps actual_rps,int *rps_view,float color_saturation, float *other_color) {
 video_planet *planetg = &the_video_planet_tetrahedron;
 
-glGenBuffers(1,&planetg->gl_vertex_buf);
-checkGlError("getvertex");
-glBindBuffer(GL_ARRAY_BUFFER,planetg->gl_vertex_buf);
+
+memset((void *)planetg,0,sizeof(video_planet));
+
+
+
 
 planetg->base = allocate_video_data(TETRAHEDRON_VERTEXES,TETRAHEDRON_INDEXES);
+
+
+multi_bind_vertex_buffer(planetg);
 
 for (int i=0;i<planetg->base->number_indexes;i++) {
   planetg->base->indexes[i] = tetrahedronIndices[i];
@@ -653,15 +991,28 @@ for (int i=0;i<planetg->base->number_vertexes;i++) {
   planetg->base->vertexes[i*4+3] = 1.f;
   }
 
+
 generate_colors(planetg->base,actual_rps,rps_view,color_saturation,other_color);
+
+// hack;
+
+planetg->base->color_info.color_saturation=0.5;
+
+compute_mixed_colors(&planetg->base->color_info,&planetg->base->color_info);
+make_data_colors_from_mixed_color(planetg->base);
+
 
 transfer_vertexes_to_indexes(planetg->base);
 
+/*
+
 video_planet_data *intermediate = expand_detail_video_data(NULL,planetg->base);
+
 video_planet_data *intermediate2 = expand_detail_video_data(NULL,intermediate);
 video_planet_data *intermediate3 = expand_detail_video_data(NULL,intermediate2);
 
 planetg->expanded = expand_detail_video_data(NULL,intermediate3);
+
 
 transfer_vertexes_to_indexes(planetg->expanded);
 
@@ -669,34 +1020,22 @@ free_video_data(intermediate);
 free_video_data(intermediate2);
 free_video_data(intermediate3);
 
+*/
+planetg->expanded = copy_video_data(planetg->base);
+
+planetg->expanded->color_info.color_saturation=1.0;
+compute_mixed_colors(&planetg->expanded->color_info,&planetg->expanded->color_info);
+make_data_colors_from_mixed_color(planetg->expanded);
+
 planetg->final = copy_video_data(planetg->expanded);
 
 init_rotation(planetg);
 
       
 
-glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat)*4*planetg->final->number_indexes, planetg->final->final_vertexes, GL_DYNAMIC_DRAW);
-checkGlError("c");
-glVertexAttribPointer(onec->mPositionHandle, 4, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
-glEnableVertexAttribArray(onec->mPositionHandle);
-checkGlError("d"); 
-glBindBuffer(GL_ARRAY_BUFFER, 0);
-checkGlError("e");
+multi_finish_binding_for_init(planetg);
 
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -717,27 +1056,34 @@ static void video_planet_step0_tetrahedron(hate_game *game,int planet_id) {
 		  
 			      
 video_planet *planetg = &the_video_planet_tetrahedron;
+
+
 rotation_step(game,planet_id,planetg);
+
+//shake_planet(game,planet_id,planetg,0.10);
+
+update_colors_via_saturation(game,planet_id,planetg);
+
+transfer_vertexes_to_indexes(planetg->final);
+
 }
 
 
 void video_planet_draw0_tetrahedron(hate_game *game,hate_screen *screen,int planet_id) {
-int show_planet = screen->planet_choices[planet_id];
+
 video_planet *planetg = &the_video_planet_tetrahedron;
-// assuming using onecolor porgaam
+// assuming using multi olor porgaam
 
-
-        glBindBuffer(GL_ARRAY_BUFFER, planetg->gl_vertex_buf);
-        glUniform4f(onec->colorHandle, 0.8f,0.0f,0.0f,1.0f);
-    glVertexAttribPointer(onec->mPositionHandle, 4, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
-    glEnableVertexAttribArray(onec->mPositionHandle);
-    glBufferData(GL_ARRAY_BUFFER, planetg->final->number_indexes*4*sizeof(GLfloat), planetg->final->final_vertexes, GL_STATIC_DRAW);
-    glDrawArrays(GL_LINE_STRIP, 0, planetg->final->number_indexes);
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-
+generic_draw_planet(game,screen,planet_id,planetg);
 
 }
+
+
+
+
+
+
+
 
 
 
@@ -763,6 +1109,7 @@ memset((void *)planetg,0,sizeof(video_planet));
 
 planetg->base = allocate_video_data(CUBE_VERTEXES,CUBE_INDEXES);
 
+multi_bind_vertex_buffer(planetg);
 
 
 glGenBuffers(1,&planetg->gl_vertex_buf);
@@ -799,13 +1146,10 @@ planetg->final = copy_video_data(planetg->expanded);
 
 init_rotation(planetg);
 
-glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat)*4*planetg->final->number_indexes, planetg->final->final_vertexes, GL_DYNAMIC_DRAW);
-checkGlError("c");
-glVertexAttribPointer(onec->mPositionHandle, 4, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
-glEnableVertexAttribArray(onec->mPositionHandle);
-checkGlError("d"); 
-glBindBuffer(GL_ARRAY_BUFFER, 0);
-checkGlError("e");
+planetg->final->color_info.color_saturation=1.0;
+planetg->expanded->color_info.color_saturation=1.0;
+
+multi_finish_binding_for_init(planetg);
 
 }
 
@@ -814,26 +1158,24 @@ checkGlError("e");
 
 static void video_planet_step1_cube(hate_game *game,int planet_id) {
 video_planet *planetg = &the_video_planet_cube;
+
 rotation_step(game,planet_id,planetg);
+
+shake_planet(game,planet_id,planetg,0.10);
+
+update_colors_via_saturation(game,planet_id,planetg);
+
+transfer_vertexes_to_indexes(planetg->final);
 
 }
 
 
 static void video_planet_draw1_cube(hate_game *game,hate_screen *screen,int planet_id) {
-int show_planet = screen->planet_choices[planet_id];
 video_planet *planetg = &the_video_planet_cube;
-video_planet_data *dat = planetg->final;
-// assuming using onecolor porgaam
+
+generic_draw_planet(game,screen,planet_id,planetg);
 
 
-        glBindBuffer(GL_ARRAY_BUFFER, planetg->gl_vertex_buf);
-        glUniform4f(onec->colorHandle, 0.0f,0.8f,0.0f,1.0f);
-    glVertexAttribPointer(onec->mPositionHandle, 4, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
-    glEnableVertexAttribArray(onec->mPositionHandle);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat)*4*dat->number_indexes, dat->final_vertexes, GL_DYNAMIC_DRAW);
-    glDrawArrays(GL_LINE_STRIP, 0, dat->number_indexes);
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 
@@ -874,6 +1216,7 @@ memset((void *)planetg,0,sizeof(video_planet));
 
 planetg->base = allocate_video_data(DIAMOND_VERTEXES,DIAMOND_INDEXES);
 
+multi_bind_vertex_buffer(planetg);
 
 
 glGenBuffers(1,&planetg->gl_vertex_buf);
@@ -910,13 +1253,10 @@ planetg->final = copy_video_data(planetg->expanded);
 
 init_rotation(planetg);
 
-glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat)*4*planetg->final->number_indexes, planetg->final->final_vertexes, GL_DYNAMIC_DRAW);
-checkGlError("c");
-glVertexAttribPointer(onec->mPositionHandle, 4, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
-glEnableVertexAttribArray(onec->mPositionHandle);
-checkGlError("d"); 
-glBindBuffer(GL_ARRAY_BUFFER, 0);
-checkGlError("e");
+multi_finish_binding_for_init(planetg);
+
+planetg->final->color_info.color_saturation=1.0;
+planetg->expanded->color_info.color_saturation=1.0;
 
 }
 
@@ -927,6 +1267,15 @@ static void video_planet_step2_diamond(hate_game *game,int planet_id) {
 video_planet *planetg = &the_video_planet_diamond;
 rotation_step(game,planet_id,planetg);
 
+shake_planet(game,planet_id,planetg,0.10);
+
+update_colors_via_saturation(game,planet_id,planetg);
+
+transfer_vertexes_to_indexes(planetg->final);
+
+
+
+
 }
 
 
@@ -934,17 +1283,10 @@ static void video_planet_draw2_diamond(hate_game *game,hate_screen *screen,int p
 int show_planet = screen->planet_choices[planet_id];
 video_planet *planetg = &the_video_planet_diamond;
 video_planet_data *dat = planetg->final;
-// assuming using onecolor porgaam
+// assuming using multiolor porgaam
 
+generic_draw_planet(game,screen,planet_id,planetg);
 
-        glBindBuffer(GL_ARRAY_BUFFER, planetg->gl_vertex_buf);
-        glUniform4f(onec->colorHandle, 0.0f,0.0f,1.0f,1.0f);
-    glVertexAttribPointer(onec->mPositionHandle, 4, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
-    glEnableVertexAttribArray(onec->mPositionHandle);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat)*4*dat->number_indexes, dat->final_vertexes, GL_DYNAMIC_DRAW);
-    glDrawArrays(GL_LINE_STRIP, 0, dat->number_indexes);
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 
@@ -993,9 +1335,7 @@ planetg->base = allocate_video_data(DODECAHEDRON_VERTEXES,DODECAHEDRON_INDEXES);
 
 
 
-glGenBuffers(1,&planetg->gl_vertex_buf);
-checkGlError("getvertex");
-glBindBuffer(GL_ARRAY_BUFFER,planetg->gl_vertex_buf);
+multi_bind_vertex_buffer(planetg);
 
 
 for (int i=0;i<20;i++) {
@@ -1079,13 +1419,7 @@ planetg->final = copy_video_data(planetg->expanded);
 
 init_rotation(planetg);
 
-glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat)*4*planetg->final->number_indexes, planetg->final->final_vertexes, GL_DYNAMIC_DRAW);
-checkGlError("c");
-glVertexAttribPointer(onec->mPositionHandle, 4, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
-glEnableVertexAttribArray(onec->mPositionHandle);
-checkGlError("d"); 
-glBindBuffer(GL_ARRAY_BUFFER, 0);
-checkGlError("e");
+multi_finish_binding_for_init(planetg);
 
 }
 
@@ -1096,24 +1430,23 @@ static void video_planet_step3_dodecahedron(hate_game *game,int planet_id) {
 video_planet *planetg = &the_video_planet_dodecahedron;
 rotation_step(game,planet_id,planetg);
 
+shake_planet(game,planet_id,planetg,0.10);
+
+update_colors_via_saturation(game,planet_id,planetg);
+
+transfer_vertexes_to_indexes(planetg->final);
+
 }
 
 
+
+
 static void video_planet_draw3_dodecahedron(hate_game *game,hate_screen *screen,int planet_id) {
-int show_planet = screen->planet_choices[planet_id];
+
 video_planet *planetg = &the_video_planet_dodecahedron;
-video_planet_data *dat = planetg->final;
-// assuming using onecolor porgaam
 
+generic_draw_planet(game,screen,planet_id,planetg);
 
-        glBindBuffer(GL_ARRAY_BUFFER, planetg->gl_vertex_buf);
-        glUniform4f(onec->colorHandle, 1.0f,1.0f,0.0f,1.0f);
-    glVertexAttribPointer(onec->mPositionHandle, 4, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
-    glEnableVertexAttribArray(onec->mPositionHandle);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat)*4*dat->number_indexes, dat->final_vertexes, GL_DYNAMIC_DRAW);
-    glDrawArrays(GL_LINE_STRIP, 0, dat->number_indexes);
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 
@@ -1138,6 +1471,7 @@ memset((void *)planetg,0,sizeof(video_planet));
 
 planetg->base = allocate_video_data(ICOSAHEDRON_VERTEXES,ICOSAHEDRON_INDEXES);
 
+multi_bind_vertex_buffer(planetg);
 
 
 glGenBuffers(1,&planetg->gl_vertex_buf);
@@ -1174,13 +1508,7 @@ planetg->final = copy_video_data(planetg->expanded);
 
 init_rotation(planetg);
 
-glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat)*4*planetg->final->number_indexes, planetg->final->final_vertexes, GL_DYNAMIC_DRAW);
-checkGlError("c");
-glVertexAttribPointer(onec->mPositionHandle, 4, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
-glEnableVertexAttribArray(onec->mPositionHandle);
-checkGlError("d"); 
-glBindBuffer(GL_ARRAY_BUFFER, 0);
-checkGlError("e");
+multi_finish_binding_for_init(planetg);
 
 }
 
@@ -1189,38 +1517,25 @@ checkGlError("e");
 
 static void video_planet_step4_icosahedron(hate_game *game,int planet_id) {
 video_planet *planetg = &the_video_planet_icosahedron;
+
+
 rotation_step(game,planet_id,planetg);
 
+shake_planet(game,planet_id,planetg,0.10);
 
-video_planet_data *e = planetg->expanded;
-video_planet_data *f = planetg->final;
- 
-for(int i=0;i<e->number_vertexes;i++) {
-  float factor = 0.97f + ((float)((unsigned int)(rand())&65535))* 0.05f/65535.f;
-  f->vertexes[i*4]= e->vertexes[i*4] * factor;
-  f->vertexes[i*4+1]= e->vertexes[i*4+1] * factor;
-  f->vertexes[i*4+2]= e->vertexes[i*4+2] * factor;
-  }
-transfer_vertexes_to_indexes(f);
+update_colors_via_saturation(game,planet_id,planetg);
+
+
+transfer_vertexes_to_indexes(planetg->final);
 
 }
 
 
+
 static void video_planet_draw4_icosahedron(hate_game *game,hate_screen *screen,int planet_id) {
-int show_planet = screen->planet_choices[planet_id];
 video_planet *planetg = &the_video_planet_icosahedron;
-video_planet_data *dat = planetg->final;
-// assuming using onecolor porgaam
+generic_draw_planet(game,screen,planet_id,planetg);
 
-
-        glBindBuffer(GL_ARRAY_BUFFER, planetg->gl_vertex_buf);
-        glUniform4f(onec->colorHandle, 1.0f,0.0f,1.0f,1.0f);
-    glVertexAttribPointer(onec->mPositionHandle, 4, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
-    glEnableVertexAttribArray(onec->mPositionHandle);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat)*4*dat->number_indexes, dat->final_vertexes, GL_DYNAMIC_DRAW);
-    glDrawArrays(GL_LINE_STRIP, 0, dat->number_indexes);
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 
@@ -1251,7 +1566,7 @@ static video_planet *all_video_planets[5];
 void video_planet_init() {
 hate_rps actual_rps;
 actual_rps.rps[0]=1.f;
-actual_rps.rps[1]=1.f;
+actual_rps.rps[1]=0.5f;
 actual_rps.rps[2]=1.f;
 actual_rps.rps[3]=1.f/20.f;
 int rps_view[4];
@@ -1260,7 +1575,7 @@ rps_view[1]=1;
 rps_view[2]=2;
 rps_view[3]=3;
 
-float color_saturation=0.f;
+float color_saturation=1.f;
 
 float other_color[4];
 other_color[0]=1.f;
@@ -1339,7 +1654,12 @@ if (pl) {
   }
 glMatrix f;
 multMatrix(&f,&r,(&onec->MVPMatrix));
-glUniformMatrix4fv(onec->mMVPMatrixHandle, 1, GL_FALSE, (GLfloat *)(&f));
+
+
+glUseProgram(multic->multi_color_program);
+checkGlError("dsw");
+glUniformMatrix4fv(multic->mMVPMatrixHandle, 1, GL_FALSE, (GLfloat *)(&f));
+checkGlError("dddw");
 
 if (show_planet==0) {
   video_planet_draw0_tetrahedron(game,screen,planet_id);
@@ -1356,6 +1676,9 @@ else if (show_planet==4) {
 else {
   video_planet_draw3_dodecahedron(game,screen,planet_id);
   }
+glUseProgram(onec->one_color_program);
+checkGlError("draw");
+
 }
 
 

@@ -138,6 +138,6 @@ player2.o: player2.c
 test7_player2.o: test7_player2.c
 	gcc -c  $(CFLAGS)  -Wl,-rpath -Wl,LIBDIR  test7_player2.c
 
-video_planets.o: video_planets.c video_planets.h
+video_planets.o: video_planets.c video_planets.h crystals_geo.h
 	gcc -c  $(CFLAGS)  -Wl,-rpath -Wl,LIBDIR  video_planets.c
 

@@ -6,7 +6,7 @@ multic->do_effect=0;
 multic->multi_color_program=0;
 multic->gvPositionHandle=0; 
 multic->gvColorHandle=0; 
-
+multic->gvElementHandle=0; 
 
 }
 

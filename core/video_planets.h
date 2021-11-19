@@ -25,6 +25,7 @@ typedef struct video_planet_color_info {
   int rps_order[4];
   float rps_colors[5][4]; // type 4 is nothing, 0 is rock, 1 is paper, 2 is scissor, 3 is water
   float color_saturation; /* 0 to 1 */
+  float mixed_colors[5][4]; // type 4 is nothing, 0 is rock, 1 is paper, 2 is scissor, 3 is water = this is mixed with rps colors and the sat color
   int number_triangles;
   float water_ratio;
   char *types;
@@ -46,6 +47,8 @@ void *expansion2;
 
 typedef struct video_planet {
 int gl_vertex_buf;
+int gl_multicolor_buf;
+int gl_element_array_buf;
 GLfloat rotation[3];
 GLfloat rotation_delta[3];
 video_planet_data *base;

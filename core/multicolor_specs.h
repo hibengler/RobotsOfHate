@@ -15,8 +15,10 @@ typedef struct multicolor_specs {
  unsigned int do_effect;
  unsigned int multi_color_program;
  unsigned int gvPositionHandle;
- int gvColorHandle;
  
+ 
+ int gvColorHandle;
+ int gvElementHandle;
  
  int mMVPMatrixHandle;
 
